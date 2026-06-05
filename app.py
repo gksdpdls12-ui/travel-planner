@@ -129,11 +129,22 @@ def delete_place(sb, place_id, image_path=None):
 
 def upload_image(sb, file_bytes, ext):
     path = f"{uuid.uuid4()}.{ext}"
+    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "png": "image/png", "webp": "image/webp"}.get(ext.lower(), f"image/{ext}")
     try:
-        sb.storage.from_(BUCKET_NAME).upload(path, file_bytes, {"content-type": f"image/{ext}"})
+        sb.storage.from_(BUCKET_NAME).upload(
+            path=path, file=file_bytes,
+            file_options={"content-type": mime, "upsert": "false"})
         return path
     except Exception as e:
-        st.warning(f"이미지 업로드 실패: {e}"); return None
+        err = str(e)
+        if "Bucket not found" in err or "bucket" in err.lower():
+            st.error(f"❌ 스토리지 버킷 '{BUCKET_NAME}'이 없어요. Supabase → Storage에서 버킷을 만들어주세요. (오류: {err})")
+        elif "security policy" in err.lower() or "policy" in err.lower():
+            st.error(f"❌ 스토리지 권한 오류. Supabase → Storage → Policies에서 업로드 정책을 추가해주세요. (오류: {err})")
+        else:
+            st.error(f"❌ 이미지 업로드 실패: {err}")
+        return None
 
 def upload_images(sb, file_list):
     if not file_list: return None
