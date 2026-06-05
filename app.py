@@ -1,6 +1,7 @@
 import streamlit as st
 from supabase import create_client, Client
 import os, json
+from urllib.parse import quote
 from dotenv import load_dotenv
 from datetime import date, timedelta
 import uuid
@@ -193,6 +194,18 @@ def show_images(sb, image_path):
     for i, p in enumerate(paths):
         with cols[i % 3]: st.image(get_img_url(sb, p), use_container_width=True)
 
+def inline_uploader(key):
+    """st.file_uploader without st.tabs — works safely inside st.form."""
+    files = st.file_uploader("이미지 (여러 장)", type=["jpg","jpeg","png","webp"],
+                              accept_multiple_files=True, key=key,
+                              label_visibility="collapsed")
+    if files:
+        cols = st.columns(min(len(files), 3))
+        for i, f in enumerate(files):
+            with cols[i % 3]: st.image(f, use_container_width=True)
+        return [(f.getvalue(), f.name.rsplit(".",1)[-1].lower() if "." in f.name else "jpg") for f in files]
+    return []
+
 # ── Card actions ──────────────────────────────────────────────────────────────
 def card_actions(sb, place, my_name, show_detail=True):
     liked_by = place.get("liked_by") or []
@@ -266,17 +279,19 @@ def edit_form_restaurant(sb, place, my_name):
         with c2: price_r = st.selectbox("가격대", PRICE_RANGES, index=safe_idx(PRICE_RANGES, next((r for r in PRICE_RANGES if r.startswith(d.get("price_range",""))), PRICE_RANGES[0])))
         c1, c2  = st.columns(2)
         with c1: status  = st.selectbox("상태", STATUSES, index=safe_idx(STATUSES, d.get("status","검토중")))
-        with c2: t_day   = st.number_input("여행 몇 일차 (0=미정)", min_value=0, max_value=10, value=int(d.get("travel_day", 0)))
-        hours   = st.text_input("영업시간", value=d.get("hours",""), key=f"eh_{pid}")
-        url     = st.text_input("지도 링크", value=place.get("url","") or "", key=f"eu_{pid}")
-        notes   = st.text_area("메모", value=place.get("notes","") or "", height=70, key=f"eno_{pid}")
+        with c2: t_day   = st.number_input("여행 몇 일차 (0=미정)", min_value=0, max_value=10, value=int(d.get("travel_day") or 0))
+        hours    = st.text_input("영업시간", value=d.get("hours",""), key=f"eh_{pid}")
+        location = st.text_input("위치 (동선용)", value=d.get("location","") or "", key=f"eloc_{pid}", placeholder="예: 제주 흑돈가")
+        url      = st.text_input("지도 링크", value=place.get("url","") or "", key=f"eu_{pid}")
+        notes    = st.text_area("메모", value=place.get("notes","") or "", height=70, key=f"eno_{pid}")
         st.caption("새 사진으로 교체할 경우에만 업로드 (비워두면 기존 유지)")
-        new_imgs = image_widget(f"ei_rst_{pid}")
+        new_imgs = inline_uploader(f"ei_rst_{pid}")
         if st.form_submit_button("💾 저장", type="primary", use_container_width=True):
             if not name.strip(): st.error("이름을 입력해주세요!"); return
             img_path = upload_images(sb, new_imgs) if new_imgs else place.get("image_path")
             new_d = {**d, "cuisine": cuisine, "price_range": price_r.split()[0],
                      "hours": hours.strip() or None, "status": status,
+                     "location": location.strip() or None,
                      "travel_day": t_day if t_day else None}
             update_place(sb, pid, {"name": name.strip(), "url": url.strip() or None,
                                    "notes": notes.strip() or None, "image_path": img_path, "details": new_d})
@@ -297,12 +312,13 @@ def edit_form_activity(sb, place, my_name):
         with c2: price    = st.text_input("이용료", value=str(d["price"]) if d.get("price") else "", key=f"eap_{pid}")
         c1, c2   = st.columns(2)
         with c1: status  = st.selectbox("상태", STATUSES, index=safe_idx(STATUSES, d.get("status","검토중")))
-        with c2: t_day   = st.number_input("여행 몇 일차 (0=미정)", min_value=0, max_value=10, value=int(d.get("travel_day", 0)))
+        with c2: t_day   = st.number_input("여행 몇 일차 (0=미정)", min_value=0, max_value=10, value=int(d.get("travel_day") or 0))
         duration = st.text_input("소요 시간", value=d.get("duration","") or "", key=f"ead_{pid}")
+        location = st.text_input("위치 (동선용)", value=d.get("location","") or "", key=f"elocat_{pid}", placeholder="예: 제주 만장굴")
         url      = st.text_input("링크", value=place.get("url","") or "", key=f"eau_{pid}")
         notes    = st.text_area("메모", value=place.get("notes","") or "", height=70, key=f"eano_{pid}")
         st.caption("새 사진으로 교체할 경우에만 업로드")
-        new_imgs = image_widget(f"ei_act_{pid}")
+        new_imgs = inline_uploader(f"ei_act_{pid}")
         if st.form_submit_button("💾 저장", type="primary", use_container_width=True):
             if not name.strip(): st.error("이름을 입력해주세요!"); return
             img_path = upload_images(sb, new_imgs) if new_imgs else place.get("image_path")
@@ -311,6 +327,7 @@ def edit_form_activity(sb, place, my_name):
             except: pass
             new_d = {**d, "activity_type": act_type, "price": price_val,
                      "duration": duration.strip() or None, "status": status,
+                     "location": location.strip() or None,
                      "travel_day": t_day if t_day else None}
             update_place(sb, pid, {"name": name.strip(), "url": url.strip() or None,
                                    "notes": notes.strip() or None, "image_path": img_path, "details": new_d})
@@ -394,12 +411,12 @@ def edit_form_accommodation(sb, place, my_name):
         with c2: check_out = st.text_input("체크아웃", value=d.get("check_out","") or "", key=f"eacco_{pid}")
         c1, c2 = st.columns(2)
         with c1: status  = st.selectbox("상태", STATUSES, index=safe_idx(STATUSES, d.get("status","검토중")))
-        with c2: t_day   = st.number_input("여행 몇 일차 (0=미정)", min_value=0, max_value=10, value=int(d.get("travel_day", 0)))
-        address     = st.text_input("주소", value=d.get("address","") or "", key=f"eacca_{pid}")
+        with c2: t_day   = st.number_input("여행 몇 일차 (0=미정)", min_value=0, max_value=10, value=int(d.get("travel_day") or 0))
+        address     = st.text_input("주소 (동선용)", value=d.get("address","") or "", key=f"eacca_{pid}")
         booking_url = st.text_input("예약 링크", value=d.get("booking_url","") or "", key=f"eaccbu_{pid}")
         notes       = st.text_area("메모", value=place.get("notes","") or "", height=70, key=f"eaccno_{pid}")
         st.caption("새 사진으로 교체할 경우에만 업로드")
-        new_imgs = image_widget(f"ei_acc_{pid}")
+        new_imgs = inline_uploader(f"ei_acc_{pid}")
         if st.form_submit_button("💾 저장", type="primary", use_container_width=True):
             if not name.strip(): st.error("이름을 입력해주세요!"); return
             img_path = upload_images(sb, new_imgs) if new_imgs else place.get("image_path")
@@ -428,16 +445,18 @@ def card_restaurant(sb, place, my_name):
     thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
                   f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
                   ) if img_paths else ""
-    st.markdown(
-        f'<div class="card" style="border-left-color:{CAT_COLOR["맛집"]};display:flex;align-items:flex-start;gap:10px;">'
-        f'<div style="flex:1;min-width:0;">'
-        f'<div style="display:flex;justify-content:space-between;align-items:start;">'
-        f'<span class="card-title">🍽️ {place["name"]}</span>'
-        f'<span class="badge">{place["added_by"]}</span></div>'
-        f'<div style="margin-top:4px;">{chips}</div></div>'
-        f'{thumb_html}</div>',
-        unsafe_allow_html=True)
-    is_open, is_edit = card_actions(sb, place, my_name)
+    with st.container(border=True):
+        st.markdown(
+            f'<div style="border-left:4px solid {CAT_COLOR["맛집"]};padding-left:10px;'
+            f'display:flex;align-items:flex-start;gap:10px;">'
+            f'<div style="flex:1;min-width:0;">'
+            f'<div style="display:flex;justify-content:space-between;align-items:start;">'
+            f'<span class="card-title">🍽️ {place["name"]}</span>'
+            f'<span class="badge">{place["added_by"]}</span></div>'
+            f'<div style="margin-top:4px;">{chips}</div></div>'
+            f'{thumb_html}</div>',
+            unsafe_allow_html=True)
+        is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_restaurant(sb, place, my_name)
     elif is_open:
@@ -445,7 +464,6 @@ def card_restaurant(sb, place, my_name):
         if place.get("url"):   st.markdown(f"[🗺️ 지도 보기]({place['url']})")
         if place.get("notes"): st.markdown(f"📝 {place['notes']}")
         if img_paths:          show_images(sb, place.get("image_path"))
-    st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
 
 
 def card_activity(sb, place, my_name):
@@ -459,23 +477,24 @@ def card_activity(sb, place, my_name):
     thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
                   f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
                   ) if img_paths else ""
-    st.markdown(
-        f'<div class="card" style="border-left-color:{CAT_COLOR["놀거리"]};display:flex;align-items:flex-start;gap:10px;">'
-        f'<div style="flex:1;min-width:0;">'
-        f'<div style="display:flex;justify-content:space-between;align-items:start;">'
-        f'<span class="card-title">🎡 {place["name"]}</span>'
-        f'<span class="badge">{place["added_by"]}</span></div>'
-        f'<div style="margin-top:4px;">{chips}</div></div>'
-        f'{thumb_html}</div>',
-        unsafe_allow_html=True)
-    is_open, is_edit = card_actions(sb, place, my_name)
+    with st.container(border=True):
+        st.markdown(
+            f'<div style="border-left:4px solid {CAT_COLOR["놀거리"]};padding-left:10px;'
+            f'display:flex;align-items:flex-start;gap:10px;">'
+            f'<div style="flex:1;min-width:0;">'
+            f'<div style="display:flex;justify-content:space-between;align-items:start;">'
+            f'<span class="card-title">🎡 {place["name"]}</span>'
+            f'<span class="badge">{place["added_by"]}</span></div>'
+            f'<div style="margin-top:4px;">{chips}</div></div>'
+            f'{thumb_html}</div>',
+            unsafe_allow_html=True)
+        is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_activity(sb, place, my_name)
     elif is_open:
         if place.get("url"):   st.markdown(f"[🗺️ 지도/사이트]({place['url']})")
         if place.get("notes"): st.markdown(f"📝 {place['notes']}")
         if img_paths:          show_images(sb, place.get("image_path"))
-    st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
 
 
 def card_flight(sb, place, my_name):
@@ -495,9 +514,13 @@ def card_flight(sb, place, my_name):
     sc = STATUS_COLOR.get(status, "#ccc")
     st_chip = f'<span class="chip" style="background:{sc}22;color:{sc};border:1px solid {sc}55;">{STATUS_ICON.get(status,"")} {status}</span>'
 
+    notes_preview = (place.get("notes") or "")[:30]
     html  = '<div class="flight-simple">'
     html += '<div style="display:flex;justify-content:space-between;align-items:center;">'
-    html += f'<span style="font-size:13px;font-weight:700;">{plan_badge}✈️ {airline}</span>'
+    html += f'<span style="font-size:13px;font-weight:700;">{plan_badge} ✈️'
+    if notes_preview:
+        html += f' <span style="font-size:11px;font-weight:400;color:#888;">· {notes_preview}</span>'
+    html += '</span>'
     html += f'<span class="badge">{place["added_by"]}</span></div>'
     html += f'<div style="margin:4px 0;">{st_chip}</div>'
     html += '<div class="meta" style="margin-bottom:4px;">가는 편</div>'
@@ -518,15 +541,12 @@ def card_flight(sb, place, my_name):
         html += '</div>'
     if d.get("booking_url"):
         html += f'<div class="meta" style="margin-top:6px;"><a href="{d["booking_url"]}" target="_blank">🔖 예약 링크</a></div>'
-    if place.get("notes"):
-        html += f'<div class="meta" style="margin-top:4px;">📝 {place["notes"]}</div>'
     html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
-
-    _, is_edit = card_actions(sb, place, my_name, show_detail=False)
+    with st.container(border=True):
+        st.markdown(html, unsafe_allow_html=True)
+        _, is_edit = card_actions(sb, place, my_name, show_detail=False)
     if is_edit:
         edit_form_flight(sb, place, my_name)
-    st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
 
 
 def card_accommodation(sb, place, my_name):
@@ -542,17 +562,19 @@ def card_accommodation(sb, place, my_name):
     thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
                   f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
                   ) if img_paths else ""
-    st.markdown(
-        f'<div class="card" style="border-left-color:{CAT_COLOR["숙소"]};display:flex;align-items:flex-start;gap:10px;">'
-        f'<div style="flex:1;min-width:0;">'
-        f'<div style="display:flex;justify-content:space-between;align-items:start;">'
-        f'<span class="card-title">🏨 {place["name"]}</span>'
-        f'<span class="badge">{place["added_by"]}</span></div>'
-        f'<div style="margin-top:4px;">{chips}</div>'
-        f'{check_str}</div>'
-        f'{thumb_html}</div>',
-        unsafe_allow_html=True)
-    is_open, is_edit = card_actions(sb, place, my_name)
+    with st.container(border=True):
+        st.markdown(
+            f'<div style="border-left:4px solid {CAT_COLOR["숙소"]};padding-left:10px;'
+            f'display:flex;align-items:flex-start;gap:10px;">'
+            f'<div style="flex:1;min-width:0;">'
+            f'<div style="display:flex;justify-content:space-between;align-items:start;">'
+            f'<span class="card-title">🏨 {place["name"]}</span>'
+            f'<span class="badge">{place["added_by"]}</span></div>'
+            f'<div style="margin-top:4px;">{chips}</div>'
+            f'{check_str}</div>'
+            f'{thumb_html}</div>',
+            unsafe_allow_html=True)
+        is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_accommodation(sb, place, my_name)
     elif is_open:
@@ -560,7 +582,6 @@ def card_accommodation(sb, place, my_name):
         if d.get("booking_url"): st.markdown(f"[🔖 예약 링크]({d['booking_url']})")
         if place.get("notes"):   st.markdown(f"📝 {place['notes']}")
         if img_paths:            show_images(sb, place.get("image_path"))
-    st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
 
 
 # ── Add forms ─────────────────────────────────────────────────────────────────
@@ -571,18 +592,20 @@ def form_restaurant(sb, my_name):
         c1,c2 = st.columns(2)
         with c1: cuisine = st.selectbox("음식 종류", CUISINE_TYPES)
         with c2: price_r = st.selectbox("가격대", PRICE_RANGES)
-        hours = st.text_input("영업시간", placeholder="예: 11:00~21:00")
-        url   = st.text_input("지도 링크 (선택)")
-        notes = st.text_area("메모", placeholder="추천 이유 등", height=70)
-        st.markdown("**사진 (여러 장 가능)**")
-        img_files = image_widget("rst")
+        hours    = st.text_input("영업시간", placeholder="예: 11:00~21:00")
+        location = st.text_input("위치 (동선용)", placeholder="예: 제주 흑돈가")
+        url      = st.text_input("지도 링크 (선택)")
+        notes    = st.text_area("메모", placeholder="추천 이유 등", height=70)
+        st.caption("**사진 (여러 장 가능)**")
+        img_files = inline_uploader("rst")
         if st.form_submit_button("✅ 추가하기", type="primary", use_container_width=True):
             if not name.strip(): st.error("이름을 입력해주세요!"); return
             add_place(sb, {"added_by": my_name, "category": "맛집", "name": name.strip(),
                            "url": url.strip() or None, "notes": notes.strip() or None,
                            "liked_by": [], "image_path": upload_images(sb, img_files),
                            "details": {"cuisine": cuisine, "price_range": price_r.split()[0],
-                                       "hours": hours.strip() or None, "status": "검토중"}})
+                                       "hours": hours.strip() or None, "status": "검토중",
+                                       "location": location.strip() or None}})
             st.success(f"✅ '{name}' 추가!"); st.rerun()
 
 
@@ -594,10 +617,11 @@ def form_activity(sb, my_name):
         with c1: act_type = st.selectbox("종류", ACTIVITY_TYPES)
         with c2: price    = st.text_input("이용료", placeholder="예: 10000")
         duration = st.text_input("소요 시간", placeholder="예: 약 2시간")
+        location = st.text_input("위치 (동선용)", placeholder="예: 제주 만장굴")
         url      = st.text_input("링크 (선택)")
         notes    = st.text_area("메모", height=70)
-        st.markdown("**사진 (여러 장 가능)**")
-        img_files = image_widget("act")
+        st.caption("**사진 (여러 장 가능)**")
+        img_files = inline_uploader("act")
         if st.form_submit_button("✅ 추가하기", type="primary", use_container_width=True):
             if not name.strip(): st.error("이름을 입력해주세요!"); return
             price_val = None
@@ -607,7 +631,8 @@ def form_activity(sb, my_name):
                            "url": url.strip() or None, "notes": notes.strip() or None,
                            "liked_by": [], "image_path": upload_images(sb, img_files),
                            "details": {"activity_type": act_type, "price": price_val,
-                                       "duration": duration.strip() or None, "status": "검토중"}})
+                                       "duration": duration.strip() or None, "status": "검토중",
+                                       "location": location.strip() or None}})
             st.success(f"✅ '{name}' 추가!"); st.rerun()
 
 
@@ -679,11 +704,11 @@ def form_accommodation(sb, my_name):
         c1, c2 = st.columns(2)
         with c1: check_in  = st.text_input("체크인", placeholder="15:00")
         with c2: check_out = st.text_input("체크아웃", placeholder="11:00")
-        address     = st.text_input("주소 (선택)")
+        address     = st.text_input("주소 (동선용)", placeholder="예: 제주시 애월읍")
         booking_url = st.text_input("예약 링크 (선택)")
         notes       = st.text_area("메모", height=70)
-        st.markdown("**사진 (여러 장 가능)**")
-        img_files = image_widget("acc")
+        st.caption("**사진 (여러 장 가능)**")
+        img_files = inline_uploader("acc")
         if st.form_submit_button("✅ 추가하기", type="primary", use_container_width=True):
             if not name.strip(): st.error("이름을 입력해주세요!"); return
             price_val = None
@@ -880,10 +905,22 @@ with tab_schedule:
                 day_places  = [p for p in conf_scheduled
                                if int((p.get("details") or {}).get("travel_day", 0)) == day]
 
+                # 이동 동선 Google Maps URL
+                locs = []
+                for p in day_places:
+                    pd = p.get("details") or {}
+                    loc = pd.get("location") or pd.get("address") or p["name"]
+                    locs.append(loc)
+                maps_url = ("https://www.google.com/maps/dir/" +
+                            "/".join(quote(l) for l in locs)) if len(locs) >= 2 else ""
+
                 html += '<div style="min-width:150px;flex:1;background:#f8f9fa;border-radius:10px;overflow:hidden;">'
                 html += f'<div style="text-align:center;background:#5B8DEF;color:#fff;padding:8px 4px;">'
                 html += f'<div style="font-weight:800;font-size:14px;">Day {day}</div>'
-                html += f'<div style="font-size:11px;opacity:.85;">{date_label} ({weekday})</div></div>'
+                html += f'<div style="font-size:11px;opacity:.85;">{date_label} ({weekday})</div>'
+                if maps_url:
+                    html += f'<div style="margin-top:4px;"><a href="{maps_url}" target="_blank" style="color:#fff;font-size:10px;opacity:.9;text-decoration:underline;">🗺️ 동선 보기</a></div>'
+                html += '</div>'
 
                 for p in day_places:
                     d   = p.get("details") or {}
