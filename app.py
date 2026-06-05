@@ -45,8 +45,8 @@ a { color:#5B8DEF; }
     border-radius:20px; margin:20px 0; }
 .card { border-radius:12px; padding:12px; margin:6px 0;
     box-shadow:0 2px 8px rgba(0,0,0,.07);
-    background:#fff; border-left:4px solid #ccc; overflow:hidden; }
-.card-title { font-size:15px; font-weight:700; }
+    background:#fff; border-left:4px solid #ccc; overflow:hidden; color:#1a1a1a; }
+.card-title { font-size:15px; font-weight:700; color:#1a1a1a; }
 .chip { display:inline-block; border-radius:16px; padding:2px 8px;
     font-size:11px; font-weight:600; margin-right:3px; }
 .chip-blue   { background:#e8f0fe; color:#1a73e8; }
@@ -64,8 +64,8 @@ a { color:#5B8DEF; }
     padding:2px 7px; font-size:11px; margin-right:2px; }
 .flight-simple { border-radius:12px; padding:12px; margin:6px 0;
     background:linear-gradient(135deg,#f0f4ff,#fff);
-    border:1.5px solid #c5d4f5; box-shadow:0 2px 8px rgba(0,0,0,.07); }
-.f-route { font-size:14px; font-weight:700; color:#333; }
+    border:1.5px solid #c5d4f5; box-shadow:0 2px 8px rgba(0,0,0,.07); color:#1a1a1a; }
+.f-route { font-size:14px; font-weight:700; color:#1a1a1a; }
 .f-price  { font-size:13px; font-weight:800; color:#FF6B6B; }
 .countdown { text-align:center; background:linear-gradient(135deg,#667eea,#764ba2);
     border-radius:12px; padding:12px; color:#fff; margin-bottom:10px; }
@@ -816,7 +816,7 @@ with tab_schedule:
                 status_val = d.get("status", "검토중")
                 sc = STATUS_COLOR.get(status_val, "#ccc")
                 st.markdown(
-                    f'<div style="padding:6px 10px;background:#f0f4ff;border-radius:8px;margin:3px 0;">'
+                    f'<div style="padding:6px 10px;background:#f0f4ff;border-radius:8px;margin:3px 0;color:#1a1a1a;">'
                     f'<span style="font-weight:700;">{plan}</span> · {d.get("airline","")} '
                     f'{d.get("dep_airport","")} {d.get("dep_time","")} → {d.get("arr_airport","")} {d.get("arr_time","")}'
                     f' &nbsp; <span style="font-size:11px;color:{sc};">{STATUS_ICON.get(status_val,"")} {status_val}</span>'
@@ -841,7 +841,7 @@ with tab_schedule:
                         price_str = f" · {int(d['price']):,}원"
                     st.markdown(
                         f'<div style="padding:6px 10px;border-left:3px solid {CAT_COLOR.get(p["category"],"#ccc")};'
-                        f'margin:3px 0;background:#fafafa;border-radius:0 8px 8px 0;">'
+                        f'margin:3px 0;background:#fafafa;border-radius:0 8px 8px 0;color:#1a1a1a;">'
                         f'{icon} <strong>{p["name"]}</strong>{price_str}'
                         f' &nbsp;<span style="font-size:11px;color:{sc};">{STATUS_ICON.get(status_val,"")} {status_val}</span>'
                         f'<span style="float:right;font-size:11px;color:#aaa;">by {p["added_by"]}</span></div>',
