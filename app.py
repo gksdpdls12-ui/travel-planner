@@ -46,145 +46,138 @@ st.set_page_config(page_title="✈️ 여행 플래너", page_icon="✈️",
 
 st.markdown("""
 <style>
-/* ── Global ─────────────────────────────────────────────────────────────────── */
-.stApp,[data-testid="stAppViewContainer"],.main { background:#ffffff !important; }
-section[data-testid="stSidebar"] { background:#f8f8f8 !important; }
-.main > div { padding:.4rem .8rem; }
-h1,h2,h3,h4,p,span,div,label { color:#1a1a1a; }
-a { color:#1a1a1a; text-decoration:underline; }
-[data-testid="stHeader"] { background:#ffffff !important; }
-footer,#MainMenu { visibility:hidden; }
+/* ── Global ── */
+.stApp,[data-testid="stAppViewContainer"],.main{background:#ffffff!important;}
+section[data-testid="stSidebar"]{background:#f8f8f8!important;}
+.main>div{padding:.3rem .5rem;}
+h1,h2,h3,h4,p,span,div,label{color:#1a1a1a;}
+a{color:#1a1a1a;text-decoration:underline;}
+[data-testid="stHeader"]{background:#ffffff!important;}
+footer,#MainMenu{visibility:hidden;}
 
-/* ── Tabs ─────────────────────────────────────────────────────────────────────── */
-.stTabs [data-baseweb="tab-list"] {
-    background:#f0f0f0; border-radius:12px; padding:4px; gap:2px;
-    overflow-x:auto; scrollbar-width:none; border:none !important; }
-.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display:none; }
-.stTabs [data-baseweb="tab"] {
-    border-radius:8px !important; font-size:12px !important; padding:7px 12px !important;
-    font-weight:700 !important; color:#555 !important; background:transparent !important;
-    border:none !important; white-space:nowrap; }
-.stTabs [aria-selected="true"] {
-    background:#ffffff !important; color:#000000 !important;
-    box-shadow:0 1px 4px rgba(0,0,0,.15) !important; }
+/* ── Tabs ── */
+.stTabs [data-baseweb="tab-list"]{
+    background:#f0f0f0;border-radius:12px;padding:4px;gap:2px;
+    overflow-x:auto;scrollbar-width:none;border:none!important;
+    -webkit-overflow-scrolling:touch;}
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar{display:none;}
+.stTabs [data-baseweb="tab"]{
+    border-radius:8px!important;font-size:12px!important;padding:7px 10px!important;
+    font-weight:700!important;color:#555!important;background:transparent!important;
+    border:none!important;white-space:nowrap!important;min-width:fit-content!important;}
+.stTabs [aria-selected="true"]{
+    background:#ffffff!important;color:#000000!important;
+    box-shadow:0 1px 4px rgba(0,0,0,.15)!important;}
 .stTabs [data-baseweb="tab-highlight"],
-.stTabs [data-baseweb="tab-border"] { display:none !important; }
+.stTabs [data-baseweb="tab-border"]{display:none!important;}
 
-/* ── Buttons ─────────────────────────────────────────────────────────────────── */
-.stButton > button {
-    border-radius:8px !important; font-weight:700 !important; font-size:13px !important;
-    padding:7px 14px !important; border:1.5px solid #aaa !important;
-    background:#ffffff !important; color:#000000 !important;
-    box-shadow:none !important; }
-.stButton > button:hover { border-color:#000 !important; background:#f5f5f5 !important; }
-.stButton > button[kind="primary"] {
-    background:#1a1a1a !important; color:#ffffff !important; border-color:#1a1a1a !important; }
+/* ── Buttons ── */
+.stButton>button{
+    border-radius:8px!important;font-weight:700!important;font-size:12px!important;
+    padding:6px 8px!important;border:1.5px solid #aaa!important;
+    background:#ffffff!important;color:#000000!important;
+    box-shadow:none!important;width:100%!important;}
+.stButton>button:hover{border-color:#000!important;background:#f5f5f5!important;}
+.stButton>button[kind="primary"]{
+    background:#1a1a1a!important;color:#ffffff!important;border-color:#1a1a1a!important;}
 
-/* ── CARD BOX — 각 카드에 둥근 테두리 ──────────────────────────────────────── */
-div[data-testid="stVerticalBlockBorderWrapper"] {
-    border-radius:18px !important;
-    border:2px solid #1a1a1a !important;
-    background:#ffffff !important;
-    overflow:hidden !important;
-    margin:8px 0 !important;
-    box-shadow:none !important; }
-/* 카드 내부 여백 */
-div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
-    padding:4px !important; }
+/* ── CARD BOX ── */
+div[data-testid="stVerticalBlockBorderWrapper"]{
+    border-radius:16px!important;
+    border:2px solid #1a1a1a!important;
+    background:#ffffff!important;
+    overflow:hidden!important;
+    margin:6px 0!important;
+    box-shadow:none!important;}
+div[data-testid="stVerticalBlockBorderWrapper"]>div[data-testid="stVerticalBlock"]{
+    padding:2px!important;}
 
-/* ── Form ─────────────────────────────────────────────────────────────────────── */
-div[data-testid="stForm"] {
-    background:#fafafa !important; border-radius:14px !important;
-    border:1.5px solid #ccc !important; }
-.stTextInput > div > div > input,
-.stTextArea > div > div > textarea {
-    border-radius:8px !important; border:1.5px solid #ccc !important;
-    background:#ffffff !important; font-size:14px !important; color:#000 !important; }
-.stSelectbox > div > div { border-radius:8px !important; border:1.5px solid #ccc !important; }
-.stNumberInput > div > div > input {
-    border-radius:8px !important; border:1.5px solid #ccc !important; color:#000 !important; }
+/* ── Form ── */
+div[data-testid="stForm"]{
+    background:#fafafa!important;border-radius:14px!important;border:1.5px solid #ccc!important;}
+.stTextInput>div>div>input,.stTextArea>div>div>textarea{
+    border-radius:8px!important;border:1.5px solid #ccc!important;
+    background:#ffffff!important;font-size:14px!important;color:#000!important;}
+.stSelectbox>div>div{border-radius:8px!important;border:1.5px solid #ccc!important;}
+.stNumberInput>div>div>input{
+    border-radius:8px!important;border:1.5px solid #ccc!important;color:#000!important;}
 
-/* ── Expander ────────────────────────────────────────────────────────────────── */
-details[data-testid="stExpander"] {
-    border-radius:12px !important; border:1.5px solid #ccc !important;
-    background:#ffffff !important; }
+/* ── Expander ── */
+details[data-testid="stExpander"]{
+    border-radius:12px!important;border:1.5px solid #ccc!important;background:#ffffff!important;}
 
-/* ── Metrics ─────────────────────────────────────────────────────────────────── */
-[data-testid="stMetric"] {
-    background:#f8f8f8; border-radius:12px; padding:14px; border:1.5px solid #ccc; }
-[data-testid="stMetricLabel"] { font-size:12px !important; color:#444 !important; }
-[data-testid="stMetricValue"] { font-size:22px !important; font-weight:800 !important; color:#000 !important; }
+/* ── Metrics ── */
+[data-testid="stMetric"]{
+    background:#f8f8f8;border-radius:12px;padding:12px;border:1.5px solid #ccc;}
+[data-testid="stMetricLabel"]{font-size:11px!important;color:#444!important;}
+[data-testid="stMetricValue"]{font-size:19px!important;font-weight:800!important;color:#000!important;}
 
-/* ── Chips — 모두 검정 텍스트 ─────────────────────────────────────────────── */
-.chip { display:inline-block; border-radius:6px; padding:3px 10px;
-    font-size:12px; font-weight:700; margin-right:4px; margin-bottom:4px;
-    color:#000000 !important; border:1.5px solid #ccc; background:#f5f5f5; }
-.chip-blue   { background:#e8f0ff; border-color:#99b3ff; }
-.chip-green  { background:#e8f8ed; border-color:#88ccaa; }
-.chip-red    { background:#ffe8e6; border-color:#ffaaaa; }
-.chip-gray   { background:#f0f0f0; border-color:#cccccc; }
-.chip-orange { background:#fff3e0; border-color:#ffcc88; }
-.chip-teal   { background:#e0f5f3; border-color:#88cccc; }
+/* ── Chips ── */
+.chip{display:inline-block;border-radius:6px;padding:3px 8px;
+    font-size:11px;font-weight:700;margin-right:4px;margin-bottom:4px;
+    color:#000000!important;border:1.5px solid #ccc;background:#f5f5f5;}
+.chip-blue{background:#e8f0ff;border-color:#99b3ff;}
+.chip-green{background:#e8f8ed;border-color:#88ccaa;}
+.chip-red{background:#ffe8e6;border-color:#ffaaaa;}
+.chip-gray{background:#f0f0f0;border-color:#cccccc;}
+.chip-orange{background:#fff3e0;border-color:#ffcc88;}
+.chip-teal{background:#e0f5f3;border-color:#88cccc;}
 
-/* ── Badge ────────────────────────────────────────────────────────────────────── */
-.badge { background:#f0f0f0; color:#000000 !important; border-radius:6px;
-    padding:3px 10px; font-size:12px; font-weight:700; border:1.5px solid #ccc; }
+/* ── Badge ── */
+.badge{background:#f0f0f0;color:#000000!important;border-radius:6px;
+    padding:3px 8px;font-size:11px;font-weight:700;border:1.5px solid #ccc;flex-shrink:0;}
 
-/* ── Voter chip ───────────────────────────────────────────────────────────────── */
-.voter-chip { background:#f0f0f0; color:#000000 !important; border-radius:6px;
-    padding:2px 9px; font-size:12px; font-weight:600; margin-right:4px;
-    border:1px solid #ccc; }
+/* ── Card title ── */
+.card-title{font-size:15px!important;font-weight:800!important;color:#000000!important;}
 
-/* ── Meta text ───────────────────────────────────────────────────────────────── */
-.meta { font-size:12px; color:#333 !important; line-height:1.6; }
+/* ── Voter chip ── */
+.voter-chip{background:#f0f0f0;color:#000000!important;border-radius:6px;
+    padding:2px 8px;font-size:11px;font-weight:600;margin-right:4px;border:1px solid #ccc;}
 
-/* ── Countdown ────────────────────────────────────────────────────────────────── */
-.countdown { text-align:center; background:#1a1a1a; border-radius:14px;
-    padding:16px; color:#fff; margin-bottom:12px; }
-.countdown .d { font-size:42px; font-weight:900; line-height:1; color:#fff; }
-.countdown .sub { font-size:11px; opacity:.7; margin-top:5px; color:#fff; }
+/* ── Meta text ── */
+.meta{font-size:12px;color:#333!important;line-height:1.6;}
 
-/* ── Edit box ─────────────────────────────────────────────────────────────────── */
-.edit-box { background:#fafafa; border:2px dashed #ccc;
-    border-radius:12px; padding:16px; margin:8px 0; }
+/* ── Countdown ── */
+.countdown{background:#1a1a1a;border-radius:14px;padding:14px 18px;
+    margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+.countdown .d{font-size:36px;font-weight:900;line-height:1;color:#fff;}
+.countdown .dlabel{font-size:10px;opacity:.6;color:#fff;margin-top:2px;}
+.countdown .info{text-align:right;}
+.countdown .dates{font-size:13px;font-weight:700;color:#fff;}
+.countdown .members{font-size:10px;opacity:.6;color:#fff;margin-top:3px;}
 
-/* ── Name gate ────────────────────────────────────────────────────────────────── */
-.name-gate { text-align:center; padding:52px 20px; background:#f8f8f8;
-    border-radius:20px; margin:20px 0; border:2px solid #1a1a1a; }
+/* ── Edit box ── */
+.edit-box{background:#fafafa;border:2px dashed #ccc;border-radius:12px;padding:16px;margin:8px 0;}
 
-/* ── Schedule ────────────────────────────────────────────────────────────────── */
-.sch-col { min-width:155px; flex:1; background:#f8f8f8;
-    border-radius:12px; overflow:hidden; border:2px solid #1a1a1a; }
-.sch-head { text-align:center; background:#1a1a1a; color:#fff; padding:10px 6px; }
-.sch-item { border-left:3px solid #999; background:#fff;
-    margin:6px; border-radius:0 8px 8px 0; padding:8px 10px; color:#000; }
+/* ── Name gate ── */
+.name-gate{text-align:center;padding:52px 20px;background:#f8f8f8;
+    border-radius:20px;margin:20px 0;border:2px solid #1a1a1a;}
 
-/* ── Radio buttons ───────────────────────────────────────────────────────────── */
-.stRadio label { color:#000 !important; font-weight:600 !important; }
+/* ── Schedule ── */
+.sch-col{min-width:140px;flex:1;background:#f8f8f8;
+    border-radius:12px;overflow:hidden;border:2px solid #1a1a1a;}
+.sch-head{text-align:center;background:#1a1a1a;color:#fff;padding:8px 6px;font-size:13px;}
+.sch-item{border-left:3px solid #999;background:#fff;
+    margin:5px;border-radius:0 8px 8px 0;padding:7px 9px;color:#000;font-size:12px;}
 
-/* ── Mobile responsive ───────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-    .main > div { padding:.2rem .4rem !important; }
-    /* Tabs smaller on phone */
-    .stTabs [data-baseweb="tab"] {
-        font-size:11px !important; padding:6px 9px !important; }
-    /* Card title */
-    .card-title { font-size:14px !important; }
-    /* Smaller meta text */
-    .meta { font-size:11px !important; }
-    /* Chip smaller */
-    .chip { font-size:11px !important; padding:2px 7px !important; }
-    .badge { font-size:11px !important; padding:2px 7px !important; }
-    /* Buttons compact */
-    .stButton > button {
-        font-size:12px !important; padding:6px 8px !important; }
-    /* Metrics smaller */
-    [data-testid="stMetricValue"] { font-size:18px !important; }
-    /* Radio compact */
-    .stRadio label { font-size:12px !important; }
-    /* Countdown */
-    .countdown .d { font-size:32px !important; }
-}
+/* ── Radio → Pill Chips ── */
+.stRadio>div[role="radiogroup"]{
+    display:flex!important;flex-wrap:wrap!important;gap:7px!important;
+    background:transparent!important;padding:4px 0!important;}
+.stRadio>div[role="radiogroup"]>label{
+    display:flex!important;align-items:center!important;
+    padding:6px 14px!important;border-radius:20px!important;
+    border:1.5px solid #ddd!important;background:#f5f5f5!important;
+    cursor:pointer!important;white-space:nowrap!important;
+    font-size:13px!important;font-weight:700!important;color:#333!important;margin:0!important;}
+.stRadio>div[role="radiogroup"]>label>div:first-child{display:none!important;}
+.stRadio>div[role="radiogroup"]>label p,
+.stRadio>div[role="radiogroup"]>label span{
+    font-size:13px!important;font-weight:700!important;color:#333!important;margin:0!important;}
+.stRadio>div[role="radiogroup"]>label:has(input:checked){
+    background:#1a1a1a!important;border-color:#1a1a1a!important;}
+.stRadio>div[role="radiogroup"]>label:has(input:checked) p,
+.stRadio>div[role="radiogroup"]>label:has(input:checked) span{color:#ffffff!important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -883,9 +876,13 @@ with st.sidebar:
     travel_date = st.date_input("✈️ 여행 날짜", value=date(2026, 7, 1))
     days_left = (travel_date - date.today()).days
     if days_left > 0:
-        st.markdown(f'<div class="countdown"><div class="d">D-{days_left}</div>'
-                    f'<div class="sub">{travel_date.strftime("%Y.%m.%d")}</div></div>',
-                    unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="countdown">'
+            f'<div><div class="d">D-{days_left}</div><div class="dlabel">일 남았어요</div></div>'
+            f'<div class="info"><div class="dates">{travel_date.strftime("%m.%d")} 출발</div>'
+            f'<div class="members">언니 · 엄마 · 오빠 · 나</div></div>'
+            f'</div>',
+            unsafe_allow_html=True)
     elif days_left == 0: st.success("🎉 오늘 출발!")
     else: st.info("여행 완료 ✅")
 
@@ -908,13 +905,23 @@ with st.sidebar:
             st.markdown(f"{icon} {p['name'][:16]}", help=f"상태: {status_val}")
 
 # ── Header ─────────────────────────────────────────────────────────────────────
+_travel_date_main = date(2026, 7, 1)
+_days_main = (_travel_date_main - date.today()).days
 st.markdown(
-    f'<div style="padding:12px 0 10px;">'
-    f'<div style="font-size:22px;font-weight:800;color:#1a1a1a;line-height:1.2;">제주도 여행 플래너</div>'
-    f'<div style="font-size:13px;color:#555;margin-top:4px;">'
+    f'<div style="padding:10px 0 6px;">'
+    f'<div style="font-size:21px;font-weight:800;color:#1a1a1a;line-height:1.2;">제주도 여행 플래너</div>'
+    f'<div style="font-size:12px;color:#555;margin-top:3px;">{_travel_date_main.strftime("%Y.%m.%d")} · '
     f'<strong style="color:#1a1a1a;">{my_name}</strong>님과 함께해요</div>'
     f'</div>',
     unsafe_allow_html=True)
+if _days_main > 0:
+    st.markdown(
+        f'<div class="countdown">'
+        f'<div><div class="d">D-{_days_main}</div><div class="dlabel">일 남았어요</div></div>'
+        f'<div class="info"><div class="dates">{_travel_date_main.strftime("%Y.%m.%d")} 출발</div>'
+        f'<div class="members">언니 · 엄마 · 오빠 · 나</div></div>'
+        f'</div>',
+        unsafe_allow_html=True)
 
 tab_list, tab_map, tab_schedule, tab_best, tab_expense, tab_add = st.tabs(
     ["전체 목록", "지도", "일정", "베스트", "경비", "추가"])
