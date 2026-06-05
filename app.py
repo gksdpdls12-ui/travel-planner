@@ -447,13 +447,14 @@ def card_restaurant(sb, place, my_name):
                   ) if img_paths else ""
     with st.container(border=True):
         st.markdown(
-            f'<div style="border-left:4px solid {CAT_COLOR["맛집"]};padding:6px 4px 6px 12px;'
+            f'<div style="background:#fff;color:#1a1a1a;border-left:4px solid {CAT_COLOR["맛집"]};'
+            f'border-radius:8px;padding:10px 8px 6px 14px;'
             f'display:flex;align-items:flex-start;gap:10px;">'
-            f'<div style="flex:1;min-width:0;overflow:hidden;">'
+            f'<div style="flex:1;min-width:0;">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
-            f'<span class="card-title" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🍽️ {place["name"]}</span>'
+            f'<span style="font-size:15px;font-weight:700;color:#1a1a1a;">🍽️ {place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:4px;">{chips}</div></div>'
+            f'<div style="margin-top:5px;">{chips}</div></div>'
             f'{thumb_html}</div>',
             unsafe_allow_html=True)
         is_open, is_edit = card_actions(sb, place, my_name)
@@ -479,13 +480,14 @@ def card_activity(sb, place, my_name):
                   ) if img_paths else ""
     with st.container(border=True):
         st.markdown(
-            f'<div style="border-left:4px solid {CAT_COLOR["놀거리"]};padding:6px 4px 6px 12px;'
+            f'<div style="background:#fff;color:#1a1a1a;border-left:4px solid {CAT_COLOR["놀거리"]};'
+            f'border-radius:8px;padding:10px 8px 6px 14px;'
             f'display:flex;align-items:flex-start;gap:10px;">'
-            f'<div style="flex:1;min-width:0;overflow:hidden;">'
+            f'<div style="flex:1;min-width:0;">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
-            f'<span class="card-title" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🎡 {place["name"]}</span>'
+            f'<span style="font-size:15px;font-weight:700;color:#1a1a1a;">🎡 {place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:4px;">{chips}</div></div>'
+            f'<div style="margin-top:5px;">{chips}</div></div>'
             f'{thumb_html}</div>',
             unsafe_allow_html=True)
         is_open, is_edit = card_actions(sb, place, my_name)
@@ -564,13 +566,14 @@ def card_accommodation(sb, place, my_name):
                   ) if img_paths else ""
     with st.container(border=True):
         st.markdown(
-            f'<div style="border-left:4px solid {CAT_COLOR["숙소"]};padding:6px 4px 6px 12px;'
+            f'<div style="background:#fff;color:#1a1a1a;border-left:4px solid {CAT_COLOR["숙소"]};'
+            f'border-radius:8px;padding:10px 8px 6px 14px;'
             f'display:flex;align-items:flex-start;gap:10px;">'
-            f'<div style="flex:1;min-width:0;overflow:hidden;">'
+            f'<div style="flex:1;min-width:0;">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
-            f'<span class="card-title" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🏨 {place["name"]}</span>'
+            f'<span style="font-size:15px;font-weight:700;color:#1a1a1a;">🏨 {place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:4px;">{chips}</div>'
+            f'<div style="margin-top:5px;">{chips}</div>'
             f'{check_str}</div>'
             f'{thumb_html}</div>',
             unsafe_allow_html=True)
