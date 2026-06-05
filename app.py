@@ -1,10 +1,17 @@
 import streamlit as st
 from supabase import create_client, Client
-import os, json
+import os, json, urllib.request
 from urllib.parse import quote
 from dotenv import load_dotenv
 from datetime import date, timedelta
 import uuid
+
+try:
+    import folium
+    from streamlit_folium import st_folium
+    FOLIUM_AVAILABLE = True
+except ImportError:
+    FOLIUM_AVAILABLE = False
 
 load_dotenv()
 
@@ -19,7 +26,8 @@ BUCKET_NAME  = "jeju-images"
 FAMILY_PRESETS = ["언니", "엄마", "오빠", "나"]
 CATEGORIES     = ["맛집", "놀거리", "비행기", "숙소"]
 CAT_ICON       = {"맛집": "🍽️", "놀거리": "🎡", "비행기": "✈️", "숙소": "🏨"}
-CAT_COLOR      = {"맛집": "#FF6B6B", "놀거리": "#4ECDC4", "비행기": "#5B8DEF", "숙소": "#6BCB77"}
+CAT_COLOR      = {"맛집": "#E8756A", "놀거리": "#2AB5AC", "비행기": "#4361EE", "숙소": "#27AE60"}
+CAT_BG         = {"맛집": "#FFF0EF", "놀거리": "#E8FAF9", "비행기": "#EEF2FF", "숙소": "#EDFBF0"}
 CUISINE_TYPES  = ["한식", "해산물", "고기구이", "중식", "일식", "양식", "분식", "카페·디저트", "기타"]
 PRICE_RANGES   = ["₩ (1만원↓)", "₩₩ (1~3만원)", "₩₩₩ (3~5만원)", "₩₩₩₩ (5만원+)"]
 PRICE_EST      = {"₩": 8000, "₩₩": 20000, "₩₩₩": 40000, "₩₩₩₩": 70000}
@@ -30,7 +38,7 @@ ARR_AIRPORTS   = ["제주(CJU)", "부산(PUS)", "도쿄(NRT)", "오사카(KIX)",
 ROOM_TYPES     = ["호텔", "펜션", "리조트", "풀빌라", "게스트하우스", "에어비앤비", "기타"]
 EXPENSE_CATS   = ["교통", "숙소", "식비", "관광·체험", "쇼핑", "기타"]
 STATUSES       = ["검토중", "확정", "예약완료"]
-STATUS_COLOR   = {"검토중": "#f5a623", "확정": "#4ECDC4", "예약완료": "#6BCB77"}
+STATUS_COLOR   = {"검토중": "#E67E22", "확정": "#2AB5AC", "예약완료": "#27AE60"}
 STATUS_ICON    = {"검토중": "🔍", "확정": "✅", "예약완료": "🔒"}
 
 st.set_page_config(page_title="✈️ 여행 플래너", page_icon="✈️",
@@ -38,50 +46,125 @@ st.set_page_config(page_title="✈️ 여행 플래너", page_icon="✈️",
 
 st.markdown("""
 <style>
-.main > div { padding:.5rem .75rem; }
-h1,h2,h3,h4 { margin:0; }
-a { color:#5B8DEF; }
-.name-gate { text-align:center; padding:40px 20px;
-    background:linear-gradient(135deg,#667eea18,#764ba218);
-    border-radius:20px; margin:20px 0; }
-.card { border-radius:12px; padding:12px; margin:6px 0;
-    box-shadow:0 2px 8px rgba(0,0,0,.07);
-    background:#fff; border-left:4px solid #ccc; overflow:hidden; color:#1a1a1a; }
-.card-title { font-size:15px; font-weight:700; }
-.chip { display:inline-block; border-radius:16px; padding:2px 8px;
-    font-size:11px; font-weight:600; margin-right:3px; }
-.chip-blue   { background:#e8f0fe; color:#1a73e8; }
-.chip-green  { background:#e6f4ea; color:#188038; }
-.chip-red    { background:#fce8e6; color:#c5221f; }
-.chip-gray   { background:#f1f3f4; color:#5f6368; }
-.chip-orange { background:#fff3e0; color:#e65100; }
-.chip-teal   { background:#e0f2f1; color:#00695c; }
-.meta { font-size:11px; color:#888; }
-.badge { background:#e8f4fd; color:#1a73e8; border-radius:16px;
-    padding:2px 8px; font-size:11px; font-weight:600; }
-.thumb { width:56px; height:56px; object-fit:cover;
-    border-radius:8px; float:right; margin-left:8px; }
-.voter-chip { background:#fff3f3; color:#e53935; border-radius:16px;
-    padding:2px 7px; font-size:11px; margin-right:2px; }
-.flight-simple { border-radius:12px; padding:12px; margin:6px 0;
-    background:linear-gradient(135deg,#f0f4ff,#fff);
-    border:1.5px solid #c5d4f5; box-shadow:0 2px 8px rgba(0,0,0,.07); color:#1a1a1a; }
-.f-route { font-size:14px; font-weight:700; color:#1a1a1a; }
-.f-price  { font-size:13px; font-weight:800; color:#FF6B6B; }
-.countdown { text-align:center; background:linear-gradient(135deg,#667eea,#764ba2);
-    border-radius:12px; padding:12px; color:#fff; margin-bottom:10px; }
-.countdown .d { font-size:40px; font-weight:900; line-height:1; }
-.countdown .sub { font-size:11px; opacity:.8; }
-.edit-box { background:#fffbf0; border:1.5px dashed #f5a623;
-    border-radius:12px; padding:14px; margin:6px 0; }
-.day-header { background:#5B8DEF; color:#fff; border-radius:8px;
-    padding:6px 14px; font-weight:700; font-size:14px; margin:10px 0 6px 0; }
-.notice-item { background:#f8f9fa; border-radius:8px;
-    padding:8px 12px; margin:4px 0; font-size:13px; }
+/* ── Global ─────────────────────────────────────────────────────────────────── */
+.stApp,[data-testid="stAppViewContainer"],.main { background:#ffffff !important; }
+section[data-testid="stSidebar"] { background:#f8f8f8 !important; }
+.main > div { padding:.4rem .8rem; }
+h1,h2,h3,h4,p,span,div,label { color:#1a1a1a; }
+a { color:#1a1a1a; text-decoration:underline; }
+[data-testid="stHeader"] { background:#ffffff !important; }
+footer,#MainMenu { visibility:hidden; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+    background:#f0f0f0; border-radius:12px; padding:4px; gap:2px;
+    overflow-x:auto; scrollbar-width:none; border:none !important; }
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display:none; }
+.stTabs [data-baseweb="tab"] {
+    border-radius:8px !important; font-size:12px !important; padding:7px 12px !important;
+    font-weight:700 !important; color:#555 !important; background:transparent !important;
+    border:none !important; white-space:nowrap; }
+.stTabs [aria-selected="true"] {
+    background:#ffffff !important; color:#000000 !important;
+    box-shadow:0 1px 4px rgba(0,0,0,.15) !important; }
+.stTabs [data-baseweb="tab-highlight"],
+.stTabs [data-baseweb="tab-border"] { display:none !important; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+.stButton > button {
+    border-radius:8px !important; font-weight:700 !important; font-size:13px !important;
+    padding:7px 14px !important; border:1.5px solid #aaa !important;
+    background:#ffffff !important; color:#000000 !important;
+    box-shadow:none !important; }
+.stButton > button:hover { border-color:#000 !important; background:#f5f5f5 !important; }
+.stButton > button[kind="primary"] {
+    background:#1a1a1a !important; color:#ffffff !important; border-color:#1a1a1a !important; }
+
+/* ── CARD BOX — 각 카드에 둥근 테두리 ──────────────────────────────────────── */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius:18px !important;
+    border:2px solid #1a1a1a !important;
+    background:#ffffff !important;
+    overflow:hidden !important;
+    margin:8px 0 !important;
+    box-shadow:none !important; }
+/* 카드 내부 여백 */
+div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
+    padding:4px !important; }
+
+/* ── Form ─────────────────────────────────────────────────────────────────────── */
+div[data-testid="stForm"] {
+    background:#fafafa !important; border-radius:14px !important;
+    border:1.5px solid #ccc !important; }
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea {
+    border-radius:8px !important; border:1.5px solid #ccc !important;
+    background:#ffffff !important; font-size:14px !important; color:#000 !important; }
+.stSelectbox > div > div { border-radius:8px !important; border:1.5px solid #ccc !important; }
+.stNumberInput > div > div > input {
+    border-radius:8px !important; border:1.5px solid #ccc !important; color:#000 !important; }
+
+/* ── Expander ────────────────────────────────────────────────────────────────── */
+details[data-testid="stExpander"] {
+    border-radius:12px !important; border:1.5px solid #ccc !important;
+    background:#ffffff !important; }
+
+/* ── Metrics ─────────────────────────────────────────────────────────────────── */
+[data-testid="stMetric"] {
+    background:#f8f8f8; border-radius:12px; padding:14px; border:1.5px solid #ccc; }
+[data-testid="stMetricLabel"] { font-size:12px !important; color:#444 !important; }
+[data-testid="stMetricValue"] { font-size:22px !important; font-weight:800 !important; color:#000 !important; }
+
+/* ── Chips — 모두 검정 텍스트 ─────────────────────────────────────────────── */
+.chip { display:inline-block; border-radius:6px; padding:3px 10px;
+    font-size:12px; font-weight:700; margin-right:4px; margin-bottom:4px;
+    color:#000000 !important; border:1.5px solid #ccc; background:#f5f5f5; }
+.chip-blue   { background:#e8f0ff; border-color:#99b3ff; }
+.chip-green  { background:#e8f8ed; border-color:#88ccaa; }
+.chip-red    { background:#ffe8e6; border-color:#ffaaaa; }
+.chip-gray   { background:#f0f0f0; border-color:#cccccc; }
+.chip-orange { background:#fff3e0; border-color:#ffcc88; }
+.chip-teal   { background:#e0f5f3; border-color:#88cccc; }
+
+/* ── Badge ────────────────────────────────────────────────────────────────────── */
+.badge { background:#f0f0f0; color:#000000 !important; border-radius:6px;
+    padding:3px 10px; font-size:12px; font-weight:700; border:1.5px solid #ccc; }
+
+/* ── Voter chip ───────────────────────────────────────────────────────────────── */
+.voter-chip { background:#f0f0f0; color:#000000 !important; border-radius:6px;
+    padding:2px 9px; font-size:12px; font-weight:600; margin-right:4px;
+    border:1px solid #ccc; }
+
+/* ── Meta text ───────────────────────────────────────────────────────────────── */
+.meta { font-size:12px; color:#333 !important; line-height:1.6; }
+
+/* ── Countdown ────────────────────────────────────────────────────────────────── */
+.countdown { text-align:center; background:#1a1a1a; border-radius:14px;
+    padding:16px; color:#fff; margin-bottom:12px; }
+.countdown .d { font-size:42px; font-weight:900; line-height:1; color:#fff; }
+.countdown .sub { font-size:11px; opacity:.7; margin-top:5px; color:#fff; }
+
+/* ── Edit box ─────────────────────────────────────────────────────────────────── */
+.edit-box { background:#fafafa; border:2px dashed #ccc;
+    border-radius:12px; padding:16px; margin:8px 0; }
+
+/* ── Name gate ────────────────────────────────────────────────────────────────── */
+.name-gate { text-align:center; padding:52px 20px; background:#f8f8f8;
+    border-radius:20px; margin:20px 0; border:2px solid #1a1a1a; }
+
+/* ── Schedule ────────────────────────────────────────────────────────────────── */
+.sch-col { min-width:155px; flex:1; background:#f8f8f8;
+    border-radius:12px; overflow:hidden; border:2px solid #1a1a1a; }
+.sch-head { text-align:center; background:#1a1a1a; color:#fff; padding:10px 6px; }
+.sch-item { border-left:3px solid #999; background:#fff;
+    margin:6px; border-radius:0 8px 8px 0; padding:8px 10px; color:#000; }
+
+/* ── Radio buttons ───────────────────────────────────────────────────────────── */
+.stRadio label { color:#000 !important; font-weight:600 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────────────────
 def parse_image_paths(image_path):
     if not image_path: return []
     try:
@@ -98,11 +181,27 @@ def parse_date_str(s, default=date(2026, 7, 1)):
     except: return default
 
 def status_chip(status):
-    c = STATUS_COLOR.get(status, "#ccc")
-    i = STATUS_ICON.get(status, "")
-    return f'<span class="chip" style="background:{c}22;color:{c};border:1px solid {c}55;">{i} {status}</span>'
+    bg = {"검토중": "#fff3e0", "확정": "#e0f5f3", "예약완료": "#e8f8ed"}.get(status, "#f0f0f0")
+    bd = {"검토중": "#ffcc88", "확정": "#88cccc", "예약완료": "#88ccaa"}.get(status, "#ccc")
+    return f'<span class="chip" style="background:{bg};border-color:{bd};color:#000000;">{status}</span>'
 
-# ── Supabase ──────────────────────────────────────────────────────────────────
+@st.cache_data(ttl=3600)
+def geocode_location(query):
+    """Nominatim geocoding — returns (lat, lon) or None."""
+    if not query or not query.strip():
+        return None
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={quote(query.strip())}&format=json&limit=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "JejuTravelPlanner/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        if data:
+            return float(data[0]["lat"]), float(data[0]["lon"])
+    except Exception:
+        pass
+    return None
+
+# ── Supabase ───────────────────────────────────────────────────────────────────
 @st.cache_resource
 def init_sb() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -168,25 +267,7 @@ def delete_expense(sb, eid):
     try: sb.table("expenses").delete().eq("id", eid).execute()
     except Exception as e: st.error(f"삭제 실패: {e}")
 
-# ── Image widget ──────────────────────────────────────────────────────────────
-def image_widget(key_prefix):
-    t1, t2 = st.tabs(["📁 파일", "📷 카메라"])
-    with t1:
-        files = st.file_uploader("이미지 (여러 장)", type=["jpg","jpeg","png","webp"],
-                                 label_visibility="collapsed", key=f"{key_prefix}_file",
-                                 accept_multiple_files=True)
-        if files:
-            cols = st.columns(min(len(files), 3))
-            for i, f in enumerate(files):
-                with cols[i % 3]: st.image(f, use_container_width=True)
-            return [(f.getvalue(), f.name.rsplit(".",1)[-1].lower() if "." in f.name else "jpg") for f in files]
-    with t2:
-        c = st.camera_input("촬영", label_visibility="collapsed", key=f"{key_prefix}_cam")
-        if c:
-            st.image(c, use_container_width=True)
-            return [(c.getvalue(), "jpg")]
-    return []
-
+# ── Image widget ───────────────────────────────────────────────────────────────
 def show_images(sb, image_path):
     paths = parse_image_paths(image_path)
     if not paths: return
@@ -206,7 +287,7 @@ def inline_uploader(key):
         return [(f.getvalue(), f.name.rsplit(".",1)[-1].lower() if "." in f.name else "jpg") for f in files]
     return []
 
-# ── Card actions ──────────────────────────────────────────────────────────────
+# ── Card actions ───────────────────────────────────────────────────────────────
 def card_actions(sb, place, my_name, show_detail=True):
     liked_by = place.get("liked_by") or []
     show_key = f"show_{place['id']}"
@@ -217,11 +298,11 @@ def card_actions(sb, place, my_name, show_detail=True):
     d          = place.get("details") or {}
     status_val = d.get("status", "검토중")
     is_owner   = place["added_by"] == my_name
-    conf_lbl   = "🔄" if status_val == "확정" else "✅확정"
+    conf_lbl   = "확정 해제" if status_val == "확정" else "확정"
 
-    voters_html = "".join(f'<span class="voter-chip">❤️ {v}</span>' for v in liked_by)
+    voters_html = "".join(f'<span class="voter-chip">{v}</span>' for v in liked_by)
     if voters_html:
-        st.markdown(f'<div style="margin:4px 0;">{voters_html}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="margin:2px 0 4px 0;">{voters_html}</div>', unsafe_allow_html=True)
 
     if show_detail:
         if is_owner:
@@ -240,13 +321,13 @@ def card_actions(sb, place, my_name, show_detail=True):
             c_det = c_edit = c_del = None
 
     with c_vote:
-        lbl = f"{'❤️' if my_name in liked_by else '🤍'} {len(liked_by)}명"
+        lbl = f"{len(liked_by)}명"
         if st.button(lbl, key=f"v_{place['id']}"):
             toggle_vote(sb, place["id"], my_name, liked_by); st.rerun()
 
     if c_det:
         with c_det:
-            if st.button("접기 ∧" if is_open else "자세히 보기 >", key=f"det_{place['id']}"):
+            if st.button("접기" if is_open else "자세히 보기", key=f"det_{place['id']}"):
                 st.session_state[show_key] = not is_open; st.rerun()
 
     with c_conf:
@@ -256,17 +337,17 @@ def card_actions(sb, place, my_name, show_detail=True):
 
     if c_edit:
         with c_edit:
-            if st.button("취소" if is_edit else "✏️", key=f"edit_btn_{place['id']}"):
+            if st.button("취소" if is_edit else "수정", key=f"edit_btn_{place['id']}"):
                 st.session_state[edit_key] = not is_edit; st.rerun()
 
     if c_del:
         with c_del:
-            if st.button("🗑️", key=f"d_{place['id']}"):
+            if st.button("삭제", key=f"d_{place['id']}"):
                 delete_place(sb, place["id"], place.get("image_path")); st.rerun()
 
     return st.session_state.get(show_key, False), st.session_state.get(edit_key, False)
 
-# ── Edit forms ────────────────────────────────────────────────────────────────
+# ── Edit forms ─────────────────────────────────────────────────────────────────
 def edit_form_restaurant(sb, place, my_name):
     d = place.get("details") or {}
     pid = place["id"]
@@ -434,36 +515,44 @@ def edit_form_accommodation(sb, place, my_name):
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ── Card renderers ─────────────────────────────────────────────────────────────
+# ── Card renderers ──────────────────────────────────────────────────────────────
+def _cat_label(cat):
+    """작은 카테고리 텍스트 레이블."""
+    c = CAT_COLOR.get(cat, "#777")
+    bg = CAT_BG.get(cat, "#F5F2EE")
+    labels = {"맛집": "맛집", "놀거리": "놀거리", "비행기": "항공", "숙소": "숙소"}
+    label = labels.get(cat, cat)
+    return (f'<span style="font-size:10px;font-weight:700;color:{c};'
+            f'background:{bg};border-radius:6px;padding:2px 7px;">{label}</span>')
+
+
 def card_restaurant(sb, place, my_name):
     d = place.get("details") or {}
     img_paths = parse_image_paths(place.get("image_path"))
     chips = status_chip(d.get("status","검토중"))
     if d.get("cuisine"):     chips += f' <span class="chip chip-blue">{d["cuisine"]}</span>'
-    if d.get("price_range"): chips += f' <span class="chip chip-red">{d["price_range"]}</span>'
+    if d.get("price_range"): chips += f' <span class="chip chip-red">{d["price_range"].split()[0]}</span>'
     if d.get("travel_day"):  chips += f' <span class="chip chip-gray">Day {d["travel_day"]}</span>'
-    thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
-                  f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
-                  ) if img_paths else ""
+    thumb = (f'<img src="{get_img_url(sb, img_paths[0])}" '
+             f'style="width:60px;height:60px;object-fit:cover;border-radius:10px;'
+             f'flex-shrink:0;border:1px solid #ddd;">') if img_paths else ""
     with st.container(border=True):
         st.markdown(
-            f'<div style="background:#fff;color:#1a1a1a;border-left:4px solid {CAT_COLOR["맛집"]};'
-            f'border-radius:8px;padding:10px 8px 6px 14px;'
-            f'display:flex;align-items:flex-start;gap:10px;">'
+            f'<div style="display:flex;align-items:flex-start;gap:10px;padding:4px 2px 8px;">'
             f'<div style="flex:1;min-width:0;">'
-            f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
-            f'<span style="font-size:15px;font-weight:700;color:#1a1a1a;">🍽️ {place["name"]}</span>'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
+            f'<span style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:5px;">{chips}</div></div>'
-            f'{thumb_html}</div>',
+            f'<div>{chips}</div></div>'
+            f'{thumb}</div>',
             unsafe_allow_html=True)
         is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_restaurant(sb, place, my_name)
     elif is_open:
-        if d.get("hours"):     st.markdown(f"⏰ {d['hours']}")
-        if place.get("url"):   st.markdown(f"[🗺️ 지도 보기]({place['url']})")
-        if place.get("notes"): st.markdown(f"📝 {place['notes']}")
+        if d.get("hours"):     st.markdown(f"**영업시간:** {d['hours']}")
+        if place.get("url"):   st.markdown(f"[지도 보기]({place['url']})")
+        if place.get("notes"): st.markdown(f"**메모:** {place['notes']}")
         if img_paths:          show_images(sb, place.get("image_path"))
 
 
@@ -471,31 +560,29 @@ def card_activity(sb, place, my_name):
     d = place.get("details") or {}
     img_paths = parse_image_paths(place.get("image_path"))
     chips = status_chip(d.get("status","검토중"))
-    if d.get("activity_type"): chips += f' <span class="chip chip-blue">{d["activity_type"]}</span>'
-    if d.get("price"):         chips += f' <span class="chip chip-green">💰 {int(d["price"]):,}원</span>'
-    if d.get("duration"):      chips += f' <span class="chip chip-gray">⏱️ {d["duration"]}</span>'
+    if d.get("activity_type"): chips += f' <span class="chip chip-teal">{d["activity_type"]}</span>'
+    if d.get("price"):         chips += f' <span class="chip chip-green">{int(d["price"]):,}원</span>'
+    if d.get("duration"):      chips += f' <span class="chip chip-gray">{d["duration"]}</span>'
     if d.get("travel_day"):    chips += f' <span class="chip chip-gray">Day {d["travel_day"]}</span>'
-    thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
-                  f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
-                  ) if img_paths else ""
+    thumb = (f'<img src="{get_img_url(sb, img_paths[0])}" '
+             f'style="width:60px;height:60px;object-fit:cover;border-radius:10px;'
+             f'flex-shrink:0;border:1px solid #ddd;">') if img_paths else ""
     with st.container(border=True):
         st.markdown(
-            f'<div style="background:#fff;color:#1a1a1a;border-left:4px solid {CAT_COLOR["놀거리"]};'
-            f'border-radius:8px;padding:10px 8px 6px 14px;'
-            f'display:flex;align-items:flex-start;gap:10px;">'
+            f'<div style="display:flex;align-items:flex-start;gap:10px;padding:4px 2px 8px;">'
             f'<div style="flex:1;min-width:0;">'
-            f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
-            f'<span style="font-size:15px;font-weight:700;color:#1a1a1a;">🎡 {place["name"]}</span>'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
+            f'<span style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:5px;">{chips}</div></div>'
-            f'{thumb_html}</div>',
+            f'<div>{chips}</div></div>'
+            f'{thumb}</div>',
             unsafe_allow_html=True)
         is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_activity(sb, place, my_name)
     elif is_open:
-        if place.get("url"):   st.markdown(f"[🗺️ 지도/사이트]({place['url']})")
-        if place.get("notes"): st.markdown(f"📝 {place['notes']}")
+        if place.get("url"):   st.markdown(f"[지도/사이트]({place['url']})")
+        if place.get("notes"): st.markdown(f"**메모:** {place['notes']}")
         if img_paths:          show_images(sb, place.get("image_path"))
 
 
@@ -511,39 +598,43 @@ def card_flight(sb, place, my_name):
     status    = d.get("status", "검토중")
     price_str = f"{int(d['price']):,}원" if d.get("price") else "-"
 
-    plan_badge = (f'<span style="background:#5B8DEF;color:#fff;border-radius:16px;'
-                  f'padding:2px 10px;font-size:12px;font-weight:700;margin-right:6px;">{plan_no}</span>') if plan_no else ""
-    sc = STATUS_COLOR.get(status, "#ccc")
-    st_chip = f'<span class="chip" style="background:{sc}22;color:{sc};border:1px solid {sc}55;">{STATUS_ICON.get(status,"")} {status}</span>'
-
+    plan_badge = (f'<span style="background:#1a1a1a;color:#ffffff;border-radius:6px;'
+                  f'padding:3px 10px;font-size:12px;font-weight:700;margin-right:8px;">{plan_no}</span>') if plan_no else ""
+    bg_s = {"검토중": "#fff3e0", "확정": "#e0f5f3", "예약완료": "#e8f8ed"}.get(status, "#f0f0f0")
+    bd_s = {"검토중": "#ffcc88", "확정": "#88cccc", "예약완료": "#88ccaa"}.get(status, "#ccc")
+    st_chip = f'<span class="chip" style="background:{bg_s};border-color:{bd_s};color:#000000;">{status}</span>'
     notes_preview = (place.get("notes") or "")[:30]
-    html  = '<div class="flight-simple">'
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;">'
-    html += f'<span style="font-size:13px;font-weight:700;">{plan_badge} ✈️'
-    if notes_preview:
-        html += f' <span style="font-size:11px;font-weight:400;color:#888;">· {notes_preview}</span>'
-    html += '</span>'
+
+    html  = '<div style="padding:4px 2px 8px;">'
+    html += f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
+    html += f'<span style="font-size:15px;font-weight:800;color:#000000;">{plan_badge}{dep_ap} → {arr_ap}</span>'
     html += f'<span class="badge">{place["added_by"]}</span></div>'
-    html += f'<div style="margin:4px 0;">{st_chip}</div>'
-    html += '<div class="meta" style="margin-bottom:4px;">가는 편</div>'
-    html += f'<div class="f-route">{dep_ap} {dep_time} → {arr_ap} {arr_time}</div>'
-    html += f'<div class="meta">{dep_date}</div>'
-    html += f'<div class="f-price">💰 {price_str} / 1인</div>'
+    html += f'<div style="margin-bottom:6px;">{st_chip}'
+    if notes_preview:
+        html += f' <span style="font-size:12px;color:#333;">· {notes_preview}</span>'
+    html += '</div>'
+    html += f'<div class="meta">{airline} · {dep_time} → {arr_time}'
+    if dep_date: html += f' · {dep_date}'
+    html += '</div>'
+    html += f'<div style="font-size:14px;font-weight:800;color:#000000;margin-top:4px;">{price_str} / 1인</div>'
+    html += '</div>'
+
     if d.get("ret_dep_time"):
         ret_airline  = d.get("ret_airline", airline)
         ret_dep_time = d.get("ret_dep_time")
         ret_arr_time = d.get("ret_arr_time", "?")
         ret_date     = d.get("ret_date", "")
-        html += '<div style="border-top:1px dashed #c5d4f5;margin-top:10px;padding-top:10px;">'
-        html += f'<div class="meta" style="margin-bottom:4px;">↩️ 돌아오는 편 · {ret_airline}</div>'
-        html += f'<div class="f-route">{arr_ap} {ret_dep_time} → {dep_ap} {ret_arr_time}</div>'
+        html += f'<div style="border-top:2px solid #e0e0e0;margin-top:4px;padding-top:10px;">'
+        html += f'<div style="font-size:12px;color:#333;margin-bottom:4px;">돌아오는 편 · {ret_airline}</div>'
+        html += f'<div style="font-size:14px;font-weight:800;color:#000;">{arr_ap} {ret_dep_time} → {dep_ap} {ret_arr_time}</div>'
         html += f'<div class="meta">{ret_date}</div>'
         if d.get("ret_price"):
-            html += f'<div class="f-price">💰 {int(d["ret_price"]):,}원 / 1인</div>'
+            html += f'<div style="font-size:14px;font-weight:800;color:#000;">{int(d["ret_price"]):,}원 / 1인</div>'
         html += '</div>'
+
     if d.get("booking_url"):
-        html += f'<div class="meta" style="margin-top:6px;"><a href="{d["booking_url"]}" target="_blank">🔖 예약 링크</a></div>'
-    html += '</div>'
+        html += f'<div style="margin-top:8px;"><a href="{d["booking_url"]}" target="_blank" style="font-size:13px;color:#000;font-weight:700;">예약 링크 보기</a></div>'
+
     with st.container(border=True):
         st.markdown(html, unsafe_allow_html=True)
         _, is_edit = card_actions(sb, place, my_name, show_detail=False)
@@ -556,38 +647,37 @@ def card_accommodation(sb, place, my_name):
     img_paths = parse_image_paths(place.get("image_path"))
     chips = status_chip(d.get("status","검토중"))
     if d.get("room_type"):       chips += f' <span class="chip chip-green">{d["room_type"]}</span>'
-    if d.get("price_per_night"): chips += f' <span class="chip chip-red">💰 {int(d["price_per_night"]):,}원/박</span>'
+    if d.get("price_per_night"): chips += f' <span class="chip chip-red">{int(d["price_per_night"]):,}원/박</span>'
     if d.get("travel_day"):      chips += f' <span class="chip chip-gray">Day {d["travel_day"]}</span>'
     check_str = ""
     if d.get("check_in") or d.get("check_out"):
-        check_str = f'<div class="meta" style="margin-top:3px;">체크인 {d.get("check_in","")} · 체크아웃 {d.get("check_out","")}</div>'
-    thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
-                  f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
-                  ) if img_paths else ""
+        check_str = (f'<div class="meta" style="margin-top:4px;">'
+                     f'체크인 {d.get("check_in","")} · 체크아웃 {d.get("check_out","")}</div>')
+    thumb = (f'<img src="{get_img_url(sb, img_paths[0])}" '
+             f'style="width:60px;height:60px;object-fit:cover;border-radius:10px;'
+             f'flex-shrink:0;border:1px solid #ddd;">') if img_paths else ""
     with st.container(border=True):
         st.markdown(
-            f'<div style="background:#fff;color:#1a1a1a;border-left:4px solid {CAT_COLOR["숙소"]};'
-            f'border-radius:8px;padding:10px 8px 6px 14px;'
-            f'display:flex;align-items:flex-start;gap:10px;">'
+            f'<div style="display:flex;align-items:flex-start;gap:10px;padding:4px 2px 8px;">'
             f'<div style="flex:1;min-width:0;">'
-            f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
-            f'<span style="font-size:15px;font-weight:700;color:#1a1a1a;">🏨 {place["name"]}</span>'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
+            f'<span style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:5px;">{chips}</div>'
+            f'<div>{chips}</div>'
             f'{check_str}</div>'
-            f'{thumb_html}</div>',
+            f'{thumb}</div>',
             unsafe_allow_html=True)
         is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_accommodation(sb, place, my_name)
     elif is_open:
-        if d.get("address"):     st.markdown(f"📍 {d['address']}")
-        if d.get("booking_url"): st.markdown(f"[🔖 예약 링크]({d['booking_url']})")
-        if place.get("notes"):   st.markdown(f"📝 {place['notes']}")
+        if d.get("address"):     st.markdown(f"**주소:** {d['address']}")
+        if d.get("booking_url"): st.markdown(f"[예약 링크]({d['booking_url']})")
+        if place.get("notes"):   st.markdown(f"**메모:** {place['notes']}")
         if img_paths:            show_images(sb, place.get("image_path"))
 
 
-# ── Add forms ─────────────────────────────────────────────────────────────────
+# ── Add forms ──────────────────────────────────────────────────────────────────
 def form_restaurant(sb, my_name):
     st.markdown("#### 🍽️ 맛집 추가")
     with st.form("form_restaurant", clear_on_submit=True):
@@ -729,22 +819,26 @@ def form_accommodation(sb, my_name):
             st.success(f"✅ '{name}' 추가!"); st.rerun()
 
 
-# ── Guards ────────────────────────────────────────────────────────────────────
+# ── Guards ─────────────────────────────────────────────────────────────────────
 if not SUPABASE_URL or not SUPABASE_KEY:
     st.error("⚠️ `.env` 파일에 `SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 설정해주세요!")
     st.stop()
 
 sb = init_sb()
 
-# ── Name gate ─────────────────────────────────────────────────────────────────
+# ── Name gate ──────────────────────────────────────────────────────────────────
 if "my_name" not in st.session_state:
     st.session_state.my_name = st.query_params.get("name", "")
 
 if not st.session_state.my_name:
-    st.markdown('<div class="name-gate"><div style="font-size:40px;">✈️</div>'
-                '<h2 style="font-size:26px;">여행 플래너</h2>'
-                '<p style="color:#888;margin-top:6px;">이름을 선택해주세요</p></div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="name-gate">'
+        '<div style="font-size:52px;margin-bottom:10px;">✈️</div>'
+        '<div style="font-size:26px;font-weight:800;color:#1a1a1a;margin-bottom:4px;">여행 플래너</div>'
+        '<div style="font-size:14px;color:#999;margin-bottom:24px;">함께 계획하는 가족 여행</div>'
+        '<div style="font-size:13px;color:#777;font-weight:600;">이름을 선택해주세요</div>'
+        '</div>',
+        unsafe_allow_html=True)
     cols = st.columns(4)
     for i, p in enumerate(FAMILY_PRESETS):
         with cols[i]:
@@ -757,7 +851,7 @@ if not st.session_state.my_name:
 
 my_name = st.session_state.my_name
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ✈️ 여행 플래너")
     new_name = st.text_input("👤 이름", value=my_name)
@@ -798,31 +892,31 @@ with st.sidebar:
             icon = "🔒" if status_val == "예약완료" else "✅" if status_val == "확정" else "🔍"
             st.markdown(f"{icon} {p['name'][:16]}", help=f"상태: {status_val}")
 
-# ── Header ────────────────────────────────────────────────────────────────────
+# ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown(
-    f'<div style="text-align:center;padding:8px 0 4px 0;">'
-    f'<h1 style="font-size:22px;">✈️ 여행 플래너</h1>'
-    f'<p style="color:#888;font-size:13px;margin:2px 0 0 0;">반가워요 <strong>{my_name}</strong>님!</p></div>',
+    f'<div style="padding:12px 0 10px;">'
+    f'<div style="font-size:22px;font-weight:800;color:#1a1a1a;line-height:1.2;">제주도 여행 플래너</div>'
+    f'<div style="font-size:13px;color:#555;margin-top:4px;">'
+    f'<strong style="color:#1a1a1a;">{my_name}</strong>님과 함께해요</div>'
+    f'</div>',
     unsafe_allow_html=True)
 
-tab_list, tab_add, tab_schedule, tab_best, tab_expense = st.tabs(
-    ["📋 전체 목록", "➕ 추가하기", "📅 일정", "⭐ 베스트 픽", "💰 경비"])
+tab_list, tab_map, tab_schedule, tab_best, tab_expense, tab_add = st.tabs(
+    ["전체 목록", "지도", "일정", "베스트", "경비", "추가"])
 
-# ── 전체 목록 ─────────────────────────────────────────────────────────────────
+# ── 전체 목록 ──────────────────────────────────────────────────────────────────
 with tab_list:
-    c1, c2 = st.columns([3, 2])
-    with c1:
+    _c1, _c2 = st.columns([3, 2])
+    with _c1:
         sel = st.radio("카테고리", ["전체"] + CATEGORIES, horizontal=True,
-                       format_func=lambda x: f"{CAT_ICON.get(x,'📌')} {x}" if x != "전체" else "📌 전체",
                        label_visibility="collapsed")
-    with c2:
+    with _c2:
         sort_by = st.radio("정렬", ["최신순", "투표순", "상태순"], horizontal=True,
                            label_visibility="collapsed")
 
     cat_filter = None if sel == "전체" else sel
     places = get_places(sb, cat_filter)
 
-    # 정렬
     if sort_by == "투표순":
         places = sorted(places, key=lambda p: len(p.get("liked_by") or []), reverse=True)
     elif sort_by == "상태순":
@@ -830,7 +924,11 @@ with tab_list:
         places = sorted(places, key=lambda p: order.get((p.get("details") or {}).get("status","검토중"), 9))
 
     if not places:
-        st.info("아직 등록된 장소가 없어요. '추가하기' 탭에서 추가해보세요!")
+        st.markdown(
+            '<div style="text-align:center;padding:40px 20px;">'
+            '<div style="font-size:15px;font-weight:600;color:#1a1a1a;">아직 등록된 장소가 없어요</div>'
+            '<div style="font-size:13px;margin-top:4px;color:#555;">추가 탭에서 첫 장소를 추가해보세요</div>'
+            '</div>', unsafe_allow_html=True)
 
     if cat_filter == "비행기":
         plans: dict = {}
@@ -838,7 +936,7 @@ with tab_list:
             pn = (p.get("details") or {}).get("plan_no", "미분류")
             plans.setdefault(pn, []).append(p)
         for plan_name in sorted(plans.keys()):
-            st.markdown(f"### {plan_name}")
+            st.markdown(f"**{plan_name}**")
             for place in plans[plan_name]:
                 card_flight(sb, place, my_name)
     else:
@@ -849,55 +947,136 @@ with tab_list:
             elif cat == "비행기": card_flight(sb, place, my_name)
             elif cat == "숙소":   card_accommodation(sb, place, my_name)
 
-# ── 추가하기 ──────────────────────────────────────────────────────────────────
-with tab_add:
-    cat_sel = st.radio("카테고리 선택", CATEGORIES, horizontal=True,
-                       format_func=lambda x: f"{CAT_ICON[x]} {x}",
-                       label_visibility="collapsed")
-    st.markdown("")
-    if cat_sel == "맛집":    form_restaurant(sb, my_name)
-    elif cat_sel == "놀거리": form_activity(sb, my_name)
-    elif cat_sel == "비행기": form_flight(sb, my_name)
-    elif cat_sel == "숙소":   form_accommodation(sb, my_name)
+# ── 지도 ───────────────────────────────────────────────────────────────────────
+with tab_map:
+    st.markdown(
+        '<div style="font-size:18px;font-weight:800;color:#1a1a1a;margin-bottom:4px;">지도</div>'
+        '<div style="font-size:13px;color:#555;margin-bottom:12px;">등록된 맛집·놀거리·숙소 위치</div>',
+        unsafe_allow_html=True)
+    if not FOLIUM_AVAILABLE:
+        st.warning("지도 기능을 사용하려면:\n```\npip install folium streamlit-folium\n```")
+    else:
+        map_places = [p for p in get_places(sb) if p["category"] in ("맛집", "놀거리", "숙소")]
+        if not map_places:
+            st.markdown(
+                '<div style="text-align:center;padding:40px 20px;color:#999;">'
+                '<div style="font-size:40px;margin-bottom:8px;">📍</div>'
+                '<div style="font-weight:600;">표시할 장소가 없어요</div>'
+                '<div style="font-size:13px;margin-top:4px;">맛집·놀거리·숙소를 추가하면 여기에 표시돼요</div>'
+                '</div>', unsafe_allow_html=True)
+        else:
+            # 범례
+            leg_html = '<div style="display:flex;gap:14px;margin-bottom:10px;flex-wrap:wrap;">'
+            for cat, dot in [("맛집","#E8756A"), ("놀거리","#2AB5AC"), ("숙소","#27AE60")]:
+                cnt = sum(1 for p in map_places if p["category"] == cat)
+                leg_html += (f'<span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#555;">'
+                             f'<span style="width:10px;height:10px;border-radius:50%;background:{dot};display:inline-block;"></span>'
+                             f'{CAT_ICON[cat]} {cat} {cnt}개</span>')
+            leg_html += '</div>'
+            st.markdown(leg_html, unsafe_allow_html=True)
 
-# ── 일정 ──────────────────────────────────────────────────────────────────────
+            JEJU_CENTER = [33.4996, 126.5312]
+            m = folium.Map(location=JEJU_CENTER, zoom_start=11,
+                           tiles="CartoDB positron")
+            MARKER_COLOR = {"맛집": "red", "놀거리": "blue", "숙소": "green"}
+
+            failed_places = []
+            for place in map_places:
+                d   = place.get("details") or {}
+                cat = place["category"]
+                loc_str = d.get("location") or d.get("address") or ""
+                coords = geocode_location(loc_str) if loc_str else None
+                if not coords:
+                    coords = geocode_location(f"제주 {place['name']}")
+                if coords:
+                    lat, lon = coords
+                    status = d.get("status", "검토중")
+                    sc = STATUS_COLOR.get(status, "#ccc")
+                    icon_emoji = CAT_ICON.get(cat, "📌")
+                    search_q = loc_str or place["name"]
+                    maps_url = f"https://www.google.com/maps/search/{quote(search_q)}"
+
+                    popup_html = (
+                        f'<div style="min-width:160px;font-family:-apple-system,sans-serif;padding:4px;">'
+                        f'<b style="font-size:13px;color:#1a1a1a;">{icon_emoji} {place["name"]}</b><br>'
+                        f'<span style="color:{sc};font-size:11px;">{STATUS_ICON.get(status,"")} {status}</span>'
+                        f'<span style="font-size:11px;color:#999;"> · {place["added_by"]}</span><br>'
+                    )
+                    if cat == "맛집" and d.get("cuisine"):
+                        popup_html += f'<span style="font-size:11px;color:#666;">{d["cuisine"]}</span><br>'
+                    elif cat == "놀거리" and d.get("activity_type"):
+                        popup_html += f'<span style="font-size:11px;color:#666;">{d["activity_type"]}</span><br>'
+                    elif cat == "숙소" and d.get("room_type"):
+                        popup_html += f'<span style="font-size:11px;color:#666;">{d["room_type"]}</span><br>'
+                    if place.get("notes"):
+                        popup_html += f'<span style="font-size:11px;color:#888;">📝 {(place["notes"] or "")[:40]}</span><br>'
+                    popup_html += (f'<a href="{maps_url}" target="_blank" '
+                                   f'style="font-size:11px;color:#4361EE;">🗺️ 구글 지도에서 보기</a></div>')
+
+                    folium.Marker(
+                        location=[lat, lon],
+                        popup=folium.Popup(popup_html, max_width=220),
+                        tooltip=f"{icon_emoji} {place['name']}",
+                        icon=folium.Icon(color=MARKER_COLOR.get(cat, "gray"), icon="info-sign")
+                    ).add_to(m)
+                else:
+                    failed_places.append(place["name"])
+
+            st_folium(m, use_container_width=True, height=460)
+
+            if failed_places:
+                st.caption(f"⚠️ 위치를 찾지 못한 장소: {', '.join(failed_places)}"
+                           " — 위치(동선용) 또는 주소를 정확히 입력해주세요.")
+
+# ── 일정 ───────────────────────────────────────────────────────────────────────
 with tab_schedule:
-    st.markdown("### 📅 여행 달력")
-    st.caption("✅확정 또는 🔒예약완료 항목만 표시돼요. 각 카드의 ✅확정 버튼을 눌러보세요!")
+    st.markdown(
+        '<div style="font-size:18px;font-weight:800;color:#1a1a1a;margin-bottom:2px;">여행 일정</div>'
+        '<div style="font-size:13px;color:#555;margin-bottom:12px;">확정·예약완료 항목만 표시돼요</div>',
+        unsafe_allow_html=True)
 
     CONFIRMED = {"확정", "예약완료"}
-    all_places_sch  = get_places(sb)
-    conf_all        = [p for p in all_places_sch if (p.get("details") or {}).get("status") in CONFIRMED]
-    conf_flights    = [p for p in conf_all if p["category"] == "비행기"]
-    conf_scheduled  = [p for p in conf_all if p["category"] != "비행기"
-                       and (p.get("details") or {}).get("travel_day")]
+    all_places_sch   = get_places(sb)
+    conf_all         = [p for p in all_places_sch if (p.get("details") or {}).get("status") in CONFIRMED]
+    conf_flights     = [p for p in conf_all if p["category"] == "비행기"]
+    conf_scheduled   = [p for p in conf_all if p["category"] != "비행기"
+                        and (p.get("details") or {}).get("travel_day")]
     conf_unscheduled = [p for p in conf_all if p["category"] != "비행기"
                         and not (p.get("details") or {}).get("travel_day")]
 
     if not conf_flights and not conf_scheduled and not conf_unscheduled:
-        st.info("확정된 일정이 없어요. 전체 목록에서 각 항목의 ✅확정 버튼을 눌러보세요!")
+        st.markdown(
+            '<div style="text-align:center;padding:40px 20px;color:#999;">'
+            '<div style="font-size:40px;margin-bottom:8px;">📅</div>'
+            '<div style="font-weight:600;">확정된 일정이 없어요</div>'
+            '<div style="font-size:13px;margin-top:4px;">전체 목록에서 ✅확정 버튼을 눌러보세요</div>'
+            '</div>', unsafe_allow_html=True)
     else:
         # 확정 항공편
         if conf_flights:
-            st.markdown("**✈️ 확정 항공편**")
+            st.markdown('<div style="font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:6px;">✈️ 확정 항공편</div>', unsafe_allow_html=True)
             for p in conf_flights:
                 d = p.get("details") or {}
                 plan = d.get("plan_no", "")
                 status_val = d.get("status", "확정")
-                sc = STATUS_COLOR.get(status_val, "#4ECDC4")
-                html  = '<div style="padding:8px 12px;background:#f0f4ff;border-radius:8px;margin:3px 0;color:#1a1a1a;">'
-                html += f'<span style="font-weight:700;color:#5B8DEF;">{plan}</span>'
-                html += f' · {d.get("airline","")} &nbsp;'
-                html += f'<span style="font-size:12px;">{d.get("dep_airport","")} {d.get("dep_time","")} → {d.get("arr_airport","")} {d.get("arr_time","")}</span>'
-                html += f' &nbsp;<span style="font-size:11px;color:{sc};">{STATUS_ICON.get(status_val,"")} {status_val}</span>'
-                if d.get("ret_dep_time"):
-                    html += f'<div style="font-size:11px;color:#888;margin-top:2px;">↩️ 복귀 {d.get("ret_dep_time","")} → {d.get("ret_arr_time","")} · {d.get("ret_date","")}</div>'
-                html += '</div>'
-                st.markdown(html, unsafe_allow_html=True)
-            st.markdown("---")
+                sc = STATUS_COLOR.get(status_val, "#2AB5AC")
+                st.markdown(
+                    f'<div style="background:#FAFAF9;border:1px solid #F0EDE8;border-radius:14px;'
+                    f'padding:10px 14px;margin:4px 0;color:#1a1a1a;">'
+                    f'<div style="display:flex;align-items:center;justify-content:space-between;">'
+                    f'<span style="font-weight:700;color:#1a1a1a;font-size:13px;">{plan}</span>'
+                    f'<span style="font-size:11px;color:{sc};font-weight:600;">'
+                    f'{STATUS_ICON.get(status_val,"")} {status_val}</span></div>'
+                    f'<div style="font-size:13px;font-weight:600;margin-top:2px;">'
+                    f'{d.get("airline","")} &nbsp; {d.get("dep_airport","")} {d.get("dep_time","")} → {d.get("arr_airport","")} {d.get("arr_time","")}</div>'
+                    + (f'<div style="font-size:11px;color:#999;margin-top:2px;">↩️ 복귀 {d.get("ret_dep_time","")} → {d.get("ret_arr_time","")} · {d.get("ret_date","")}</div>' if d.get("ret_dep_time") else "")
+                    + '</div>',
+                    unsafe_allow_html=True)
+            st.markdown("<div style='margin:8px 0;'></div>", unsafe_allow_html=True)
 
         # 달력 그리드
         if conf_scheduled:
+            travel_date = date(2026, 7, 1)  # fallback — user can change via sidebar
             days = sorted(set(int((p.get("details") or {}).get("travel_day", 0)) for p in conf_scheduled))
 
             html = '<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;">'
@@ -908,7 +1087,6 @@ with tab_schedule:
                 day_places  = [p for p in conf_scheduled
                                if int((p.get("details") or {}).get("travel_day", 0)) == day]
 
-                # 이동 동선 Google Maps URL
                 locs = []
                 for p in day_places:
                     pd = p.get("details") or {}
@@ -917,18 +1095,18 @@ with tab_schedule:
                 maps_url = ("https://www.google.com/maps/dir/" +
                             "/".join(quote(l) for l in locs)) if len(locs) >= 2 else ""
 
-                html += '<div style="min-width:150px;flex:1;background:#f8f9fa;border-radius:10px;overflow:hidden;">'
-                html += f'<div style="text-align:center;background:#5B8DEF;color:#fff;padding:8px 4px;">'
-                html += f'<div style="font-weight:800;font-size:14px;">Day {day}</div>'
-                html += f'<div style="font-size:11px;opacity:.85;">{date_label} ({weekday})</div>'
+                html += '<div class="sch-col">'
+                html += '<div class="sch-head">'
+                html += f'<div style="font-weight:800;font-size:13px;">Day {day}</div>'
+                html += f'<div style="font-size:11px;opacity:.7;margin-top:2px;">{date_label} ({weekday})</div>'
                 if maps_url:
-                    html += f'<div style="margin-top:4px;"><a href="{maps_url}" target="_blank" style="color:#fff;font-size:10px;opacity:.9;text-decoration:underline;">🗺️ 동선 보기</a></div>'
+                    html += f'<div style="margin-top:5px;"><a href="{maps_url}" target="_blank" style="color:#fff;font-size:10px;opacity:.85;text-decoration:underline;">🗺️ 동선 보기</a></div>'
                 html += '</div>'
 
                 for p in day_places:
                     d   = p.get("details") or {}
                     icon = CAT_ICON.get(p["category"], "📌")
-                    sc   = STATUS_COLOR.get(d.get("status", "확정"), "#4ECDC4")
+                    sc   = STATUS_COLOR.get(d.get("status", "확정"), "#2AB5AC")
                     bc   = CAT_COLOR.get(p["category"], "#ccc")
                     sub  = ""
                     if p["category"] == "맛집" and d.get("cuisine"):
@@ -937,10 +1115,10 @@ with tab_schedule:
                         sub = f"{int(d['price']):,}원"
                     elif p["category"] == "숙소" and d.get("check_in"):
                         sub = f"체크인 {d['check_in']}"
-                    html += f'<div style="border-left:3px solid {bc};background:#fff;margin:5px;border-radius:0 6px 6px 0;padding:6px 8px;color:#1a1a1a;">'
+                    html += f'<div class="sch-item" style="border-left-color:{bc};">'
                     html += f'<div style="font-size:12px;font-weight:700;">{icon} {p["name"]}</div>'
                     if sub:
-                        html += f'<div style="font-size:10px;color:#888;">{sub}</div>'
+                        html += f'<div style="font-size:10px;color:#999;">{sub}</div>'
                     html += f'<div style="font-size:10px;color:{sc};margin-top:2px;">{STATUS_ICON.get(d.get("status","확정"),"")} {d.get("status","확정")}</div>'
                     html += '</div>'
 
@@ -948,40 +1126,60 @@ with tab_schedule:
             html += '</div>'
             st.markdown(html, unsafe_allow_html=True)
 
-        # 확정됐지만 일차 미배정
         if conf_unscheduled:
-            st.markdown("---")
-            st.markdown("**📋 확정 (일차 미배정)**")
+            st.markdown('<div style="font-size:13px;font-weight:700;color:#1a1a1a;margin:8px 0 4px;">📋 일차 미배정</div>', unsafe_allow_html=True)
             for p in conf_unscheduled:
                 icon = CAT_ICON.get(p["category"], "📌")
-                st.markdown(f"- {icon} **{p['name']}** · ✏️ 눌러 일차 배정하면 달력에 표시돼요")
+                st.markdown(
+                    f'<div style="background:#FAFAF9;border:1px solid #F0EDE8;border-radius:12px;'
+                    f'padding:8px 14px;margin:3px 0;font-size:13px;color:#555;">'
+                    f'{icon} <b>{p["name"]}</b> · ✏️ 일차 배정하면 달력에 표시돼요</div>',
+                    unsafe_allow_html=True)
 
-# ── 베스트 픽 ─────────────────────────────────────────────────────────────────
+# ── 베스트 픽 ──────────────────────────────────────────────────────────────────
 with tab_best:
-    st.markdown("### ⭐ 베스트 픽")
+    st.markdown(
+        '<div style="font-size:18px;font-weight:800;color:#1a1a1a;margin-bottom:2px;">베스트 픽</div>'
+        '<div style="font-size:13px;color:#555;margin-bottom:12px;">가족 투표 TOP 10</div>',
+        unsafe_allow_html=True)
     all_places = get_places(sb)
     voted = sorted([p for p in all_places if p.get("liked_by")],
                    key=lambda p: len(p["liked_by"]), reverse=True)
     if not voted:
-        st.info("아직 투표된 장소가 없어요. 좋아요를 눌러보세요! 💕")
+        st.markdown(
+            '<div style="text-align:center;padding:40px 20px;color:#999;">'
+            '<div style="font-size:40px;margin-bottom:8px;">💕</div>'
+            '<div style="font-weight:600;">아직 투표된 장소가 없어요</div>'
+            '<div style="font-size:13px;margin-top:4px;">좋아요를 눌러보세요!</div>'
+            '</div>', unsafe_allow_html=True)
     else:
-        medals = ["🥇", "🥈", "🥉"]
         for i, place in enumerate(voted[:10]):
             liked_by = place["liked_by"]
-            icon = CAT_ICON.get(place["category"], "📌")
             d = place.get("details") or {}
-            medal = medals[i] if i < 3 else f"**{i+1}.**"
+            medal = f"{i+1}위"
             detail_str = ""
             if place["category"] == "비행기":
-                detail_str = f"  · {d.get('dep_time','')}→{d.get('arr_time','')}"
+                detail_str = f" · {d.get('dep_time','')}→{d.get('arr_time','')}"
                 if d.get("price"): detail_str += f" · {int(d['price']):,}원"
             elif place["category"] == "숙소" and d.get("price_per_night"):
-                detail_str = f"  · {int(d['price_per_night']):,}원/박"
-            st.markdown(f"{medal} {icon} **{place['name']}**{detail_str}  \nby `{place['added_by']}` | 👍 {', '.join(liked_by)}")
-            st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
+                detail_str = f" · {int(d['price_per_night']):,}원/박"
+            voters = "  ".join(liked_by)
+            st.markdown(
+                f'<div style="background:#FAFAF9;border:1.5px solid #E2DDD8;border-radius:14px;'
+                f'padding:12px 16px;margin:5px 0;">'
+                f'<div style="display:flex;align-items:center;justify-content:space-between;">'
+                f'<div style="flex:1;min-width:0;">'
+                f'<span style="font-size:13px;font-weight:800;color:#1a1a1a;">{medal} {place["name"]}</span>'
+                f'<span style="font-size:12px;color:#999;">{detail_str}</span>'
+                f'</div>'
+                f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span>'
+                f'</div>'
+                f'<div style="font-size:11px;color:#999;margin-top:5px;">{voters}</div>'
+                f'</div>',
+                unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("📄 텍스트로 내보내기"):
+    if st.button("텍스트로 내보내기"):
         out = "✈️ 여행 플랜 정리\n\n"
         for cat in CATEGORIES:
             cat_places = [p for p in all_places if p["category"] == cat]
@@ -1002,9 +1200,13 @@ with tab_best:
                 out += "\n"
         st.text_area("복사해서 공유하세요!", out, height=300)
 
-# ── 경비 ─────────────────────────────────────────────────────────────────────
+# ── 경비 ───────────────────────────────────────────────────────────────────────
 with tab_expense:
-    st.markdown("### 💰 경비 관리")
+    st.markdown(
+        '<div style="font-size:18px;font-weight:800;color:#1a1a1a;margin-bottom:2px;">경비 관리</div>'
+        '<div style="font-size:13px;color:#555;margin-bottom:12px;">여행 경비를 한눈에 확인해요</div>',
+        unsafe_allow_html=True)
+
     with st.expander("➕ 경비 직접 추가"):
         with st.form("form_expense", clear_on_submit=True):
             c1, c2 = st.columns(2)
@@ -1050,8 +1252,8 @@ with tab_expense:
                             delete_expense(sb, e["id"]); st.rerun()
 
     st.markdown("---")
-    st.markdown("### 👤 인원별 여행 루틴 경비")
-    st.caption("장소 목록의 항목을 선택하면 예상 경비를 자동 계산해요.")
+    st.markdown('<div style="font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:4px;">👤 인원별 예상 경비</div>', unsafe_allow_html=True)
+    st.caption("장소별 가격을 체크하면 예상 경비를 계산해요.")
 
     all_places_exp = get_places(sb)
 
@@ -1096,3 +1298,16 @@ with tab_expense:
                     manual_total = sum(e.get("amount",0) for e in my_exps)
                     if st.checkbox(f"직접 입력 경비 포함 ({manual_total:,}원)", key=f"inc_manual_{person}"):
                         st.metric("직접 입력 포함 합계", f"{total+manual_total:,}원")
+
+# ── 추가하기 ───────────────────────────────────────────────────────────────────
+with tab_add:
+    st.markdown(
+        '<div style="font-size:18px;font-weight:800;color:#1a1a1a;margin-bottom:12px;">장소 추가</div>',
+        unsafe_allow_html=True)
+    cat_sel = st.radio("카테고리 선택", CATEGORIES, horizontal=True,
+                       label_visibility="collapsed")
+    st.markdown("")
+    if cat_sel == "맛집":    form_restaurant(sb, my_name)
+    elif cat_sel == "놀거리": form_activity(sb, my_name)
+    elif cat_sel == "비행기": form_flight(sb, my_name)
+    elif cat_sel == "숙소":   form_accommodation(sb, my_name)
