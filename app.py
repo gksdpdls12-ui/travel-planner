@@ -414,26 +414,18 @@ def card_restaurant(sb, place, my_name):
     if d.get("cuisine"):     chips += f' <span class="chip chip-blue">{d["cuisine"]}</span>'
     if d.get("price_range"): chips += f' <span class="chip chip-red">{d["price_range"]}</span>'
     if d.get("travel_day"):  chips += f' <span class="chip chip-gray">Day {d["travel_day"]}</span>'
-    if img_paths:
-        c_info, c_img = st.columns([4, 1])
-        with c_info:
-            st.markdown(
-                f'<div class="card" style="border-left-color:{CAT_COLOR["맛집"]};">'
-                f'<div style="display:flex;justify-content:space-between;align-items:start;">'
-                f'<span class="card-title">🍽️ {place["name"]}</span>'
-                f'<span class="badge">{place["added_by"]}</span></div>'
-                f'<div style="margin-top:4px;">{chips}</div></div>',
-                unsafe_allow_html=True)
-        with c_img:
-            st.image(get_img_url(sb, img_paths[0]), width=70)
-    else:
-        st.markdown(
-            f'<div class="card" style="border-left-color:{CAT_COLOR["맛집"]};">'
-            f'<div style="display:flex;justify-content:space-between;align-items:start;">'
-            f'<span class="card-title">🍽️ {place["name"]}</span>'
-            f'<span class="badge">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:4px;">{chips}</div></div>',
-            unsafe_allow_html=True)
+    thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
+                  f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
+                  ) if img_paths else ""
+    st.markdown(
+        f'<div class="card" style="border-left-color:{CAT_COLOR["맛집"]};display:flex;align-items:flex-start;gap:10px;">'
+        f'<div style="flex:1;min-width:0;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:start;">'
+        f'<span class="card-title">🍽️ {place["name"]}</span>'
+        f'<span class="badge">{place["added_by"]}</span></div>'
+        f'<div style="margin-top:4px;">{chips}</div></div>'
+        f'{thumb_html}</div>',
+        unsafe_allow_html=True)
     is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_restaurant(sb, place, my_name)
@@ -441,7 +433,7 @@ def card_restaurant(sb, place, my_name):
         if d.get("hours"):     st.markdown(f"⏰ {d['hours']}")
         if place.get("url"):   st.markdown(f"[🗺️ 지도 보기]({place['url']})")
         if place.get("notes"): st.markdown(f"📝 {place['notes']}")
-        if len(img_paths) > 1: show_images(sb, place.get("image_path"))
+        if img_paths:          show_images(sb, place.get("image_path"))
     st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
 
 
@@ -453,33 +445,25 @@ def card_activity(sb, place, my_name):
     if d.get("price"):         chips += f' <span class="chip chip-green">💰 {int(d["price"]):,}원</span>'
     if d.get("duration"):      chips += f' <span class="chip chip-gray">⏱️ {d["duration"]}</span>'
     if d.get("travel_day"):    chips += f' <span class="chip chip-gray">Day {d["travel_day"]}</span>'
-    if img_paths:
-        c_info, c_img = st.columns([4, 1])
-        with c_info:
-            st.markdown(
-                f'<div class="card" style="border-left-color:{CAT_COLOR["놀거리"]};">'
-                f'<div style="display:flex;justify-content:space-between;align-items:start;">'
-                f'<span class="card-title">🎡 {place["name"]}</span>'
-                f'<span class="badge">{place["added_by"]}</span></div>'
-                f'<div style="margin-top:4px;">{chips}</div></div>',
-                unsafe_allow_html=True)
-        with c_img:
-            st.image(get_img_url(sb, img_paths[0]), width=70)
-    else:
-        st.markdown(
-            f'<div class="card" style="border-left-color:{CAT_COLOR["놀거리"]};">'
-            f'<div style="display:flex;justify-content:space-between;align-items:start;">'
-            f'<span class="card-title">🎡 {place["name"]}</span>'
-            f'<span class="badge">{place["added_by"]}</span></div>'
-            f'<div style="margin-top:4px;">{chips}</div></div>',
-            unsafe_allow_html=True)
+    thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
+                  f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
+                  ) if img_paths else ""
+    st.markdown(
+        f'<div class="card" style="border-left-color:{CAT_COLOR["놀거리"]};display:flex;align-items:flex-start;gap:10px;">'
+        f'<div style="flex:1;min-width:0;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:start;">'
+        f'<span class="card-title">🎡 {place["name"]}</span>'
+        f'<span class="badge">{place["added_by"]}</span></div>'
+        f'<div style="margin-top:4px;">{chips}</div></div>'
+        f'{thumb_html}</div>',
+        unsafe_allow_html=True)
     is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_activity(sb, place, my_name)
     elif is_open:
         if place.get("url"):   st.markdown(f"[🗺️ 지도/사이트]({place['url']})")
         if place.get("notes"): st.markdown(f"📝 {place['notes']}")
-        if len(img_paths) > 1: show_images(sb, place.get("image_path"))
+        if img_paths:          show_images(sb, place.get("image_path"))
     st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
 
 
@@ -544,19 +528,19 @@ def card_accommodation(sb, place, my_name):
     check_str = ""
     if d.get("check_in") or d.get("check_out"):
         check_str = f'<div class="meta" style="margin-top:3px;">체크인 {d.get("check_in","")} · 체크아웃 {d.get("check_out","")}</div>'
-    card_html = (
-        f'<div class="card" style="border-left-color:{CAT_COLOR["숙소"]};">'
+    thumb_html = (f'<img src="{get_img_url(sb, img_paths[0])}" '
+                  f'style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
+                  ) if img_paths else ""
+    st.markdown(
+        f'<div class="card" style="border-left-color:{CAT_COLOR["숙소"]};display:flex;align-items:flex-start;gap:10px;">'
+        f'<div style="flex:1;min-width:0;">'
         f'<div style="display:flex;justify-content:space-between;align-items:start;">'
         f'<span class="card-title">🏨 {place["name"]}</span>'
         f'<span class="badge">{place["added_by"]}</span></div>'
         f'<div style="margin-top:4px;">{chips}</div>'
-        f'{check_str}</div>')
-    if img_paths:
-        c_info, c_img = st.columns([4, 1])
-        with c_info: st.markdown(card_html, unsafe_allow_html=True)
-        with c_img:  st.image(get_img_url(sb, img_paths[0]), width=70)
-    else:
-        st.markdown(card_html, unsafe_allow_html=True)
+        f'{check_str}</div>'
+        f'{thumb_html}</div>',
+        unsafe_allow_html=True)
     is_open, is_edit = card_actions(sb, place, my_name)
     if is_edit:
         edit_form_accommodation(sb, place, my_name)
@@ -564,7 +548,7 @@ def card_accommodation(sb, place, my_name):
         if d.get("address"):     st.markdown(f"📍 {d['address']}")
         if d.get("booking_url"): st.markdown(f"[🔖 예약 링크]({d['booking_url']})")
         if place.get("notes"):   st.markdown(f"📝 {place['notes']}")
-        if len(img_paths) > 1:   show_images(sb, place.get("image_path"))
+        if img_paths:            show_images(sb, place.get("image_path"))
     st.markdown("<hr style='margin:4px 0;border-color:#f0f0f0;'>", unsafe_allow_html=True)
 
 
