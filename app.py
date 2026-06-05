@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 import os, json
 from dotenv import load_dotenv
-from datetime import date
+from datetime import date, timedelta
 import uuid
 
 load_dotenv()
@@ -190,36 +190,55 @@ def card_actions(sb, place, my_name, show_detail=True):
     is_open  = st.session_state.get(show_key, False)
     is_edit  = st.session_state.get(edit_key, False)
 
+    d          = place.get("details") or {}
+    status_val = d.get("status", "검토중")
+    is_owner   = place["added_by"] == my_name
+    conf_lbl   = "🔄" if status_val == "확정" else "✅확정"
+
     voters_html = "".join(f'<span class="voter-chip">❤️ {v}</span>' for v in liked_by)
     if voters_html:
         st.markdown(f'<div style="margin:4px 0;">{voters_html}</div>', unsafe_allow_html=True)
 
-    cols = st.columns([3, 2, 1, 1] if show_detail else [3, 1, 1])
-    with cols[0]:
+    if show_detail:
+        if is_owner:
+            c_vote, c_det, c_conf, c_edit, c_del = st.columns([3, 2, 2, 1, 1])
+        else:
+            cols3 = st.columns([3, 2, 2])
+            c_vote, c_det, c_conf = cols3[0], cols3[1], cols3[2]
+            c_edit = c_del = None
+    else:
+        if is_owner:
+            c_vote, c_conf, c_edit, c_del = st.columns([3, 2, 1, 1])
+            c_det = None
+        else:
+            cols2 = st.columns([3, 2])
+            c_vote, c_conf = cols2[0], cols2[1]
+            c_det = c_edit = c_del = None
+
+    with c_vote:
         lbl = f"{'❤️' if my_name in liked_by else '🤍'} {len(liked_by)}명"
         if st.button(lbl, key=f"v_{place['id']}"):
             toggle_vote(sb, place["id"], my_name, liked_by); st.rerun()
-    if show_detail:
-        with cols[1]:
+
+    if c_det:
+        with c_det:
             if st.button("접기 ∧" if is_open else "자세히 보기 >", key=f"det_{place['id']}"):
                 st.session_state[show_key] = not is_open; st.rerun()
-        with cols[2]:
-            if place["added_by"] == my_name:
-                if st.button("취소" if is_edit else "✏️", key=f"edit_btn_{place['id']}"):
-                    st.session_state[edit_key] = not is_edit; st.rerun()
-        with cols[3]:
-            if place["added_by"] == my_name:
-                if st.button("🗑️", key=f"d_{place['id']}"):
-                    delete_place(sb, place["id"], place.get("image_path")); st.rerun()
-    else:
-        with cols[1]:
-            if place["added_by"] == my_name:
-                if st.button("취소" if is_edit else "✏️", key=f"edit_btn_{place['id']}"):
-                    st.session_state[edit_key] = not is_edit; st.rerun()
-        with cols[2]:
-            if place["added_by"] == my_name:
-                if st.button("🗑️", key=f"d_{place['id']}"):
-                    delete_place(sb, place["id"], place.get("image_path")); st.rerun()
+
+    with c_conf:
+        if st.button(conf_lbl, key=f"conf_{place['id']}"):
+            new_s = "검토중" if status_val == "확정" else "확정"
+            update_place(sb, place["id"], {"details": {**d, "status": new_s}}); st.rerun()
+
+    if c_edit:
+        with c_edit:
+            if st.button("취소" if is_edit else "✏️", key=f"edit_btn_{place['id']}"):
+                st.session_state[edit_key] = not is_edit; st.rerun()
+
+    if c_del:
+        with c_del:
+            if st.button("🗑️", key=f"d_{place['id']}"):
+                delete_place(sb, place["id"], place.get("image_path")); st.rerun()
 
     return st.session_state.get(show_key, False), st.session_state.get(edit_key, False)
 
@@ -795,64 +814,87 @@ with tab_add:
 
 # ── 일정 ──────────────────────────────────────────────────────────────────────
 with tab_schedule:
-    st.markdown("### 📅 여행 일정")
-    st.caption("각 항목을 수정(✏️)해서 '여행 몇 일차'를 입력하면 여기에 자동으로 정리돼요.")
+    st.markdown("### 📅 여행 달력")
+    st.caption("✅확정 또는 🔒예약완료 항목만 표시돼요. 각 카드의 ✅확정 버튼을 눌러보세요!")
 
-    all_places_sch = get_places(sb)
-    flights     = [p for p in all_places_sch if p["category"] == "비행기"]
-    scheduled   = [p for p in all_places_sch if (p.get("details") or {}).get("travel_day")]
-    unscheduled = [p for p in all_places_sch if not (p.get("details") or {}).get("travel_day")
-                   and p["category"] != "비행기"]
+    CONFIRMED = {"확정", "예약완료"}
+    all_places_sch  = get_places(sb)
+    conf_all        = [p for p in all_places_sch if (p.get("details") or {}).get("status") in CONFIRMED]
+    conf_flights    = [p for p in conf_all if p["category"] == "비행기"]
+    conf_scheduled  = [p for p in conf_all if p["category"] != "비행기"
+                       and (p.get("details") or {}).get("travel_day")]
+    conf_unscheduled = [p for p in conf_all if p["category"] != "비행기"
+                        and not (p.get("details") or {}).get("travel_day")]
 
-    if not flights and not scheduled and not unscheduled:
-        st.info("등록된 장소가 없어요.")
+    if not conf_flights and not conf_scheduled and not conf_unscheduled:
+        st.info("확정된 일정이 없어요. 전체 목록에서 각 항목의 ✅확정 버튼을 눌러보세요!")
     else:
-        # 비행기 (플랜별)
-        if flights:
-            st.markdown("**✈️ 항공편**")
-            for p in flights:
+        # 확정 항공편
+        if conf_flights:
+            st.markdown("**✈️ 확정 항공편**")
+            for p in conf_flights:
                 d = p.get("details") or {}
                 plan = d.get("plan_no", "")
-                status_val = d.get("status", "검토중")
-                sc = STATUS_COLOR.get(status_val, "#ccc")
-                st.markdown(
-                    f'<div style="padding:6px 10px;background:#f0f4ff;border-radius:8px;margin:3px 0;color:#1a1a1a;">'
-                    f'<span style="font-weight:700;">{plan}</span> · {d.get("airline","")} '
-                    f'{d.get("dep_airport","")} {d.get("dep_time","")} → {d.get("arr_airport","")} {d.get("arr_time","")}'
-                    f' &nbsp; <span style="font-size:11px;color:{sc};">{STATUS_ICON.get(status_val,"")} {status_val}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True)
+                status_val = d.get("status", "확정")
+                sc = STATUS_COLOR.get(status_val, "#4ECDC4")
+                html  = '<div style="padding:8px 12px;background:#f0f4ff;border-radius:8px;margin:3px 0;color:#1a1a1a;">'
+                html += f'<span style="font-weight:700;color:#5B8DEF;">{plan}</span>'
+                html += f' · {d.get("airline","")} &nbsp;'
+                html += f'<span style="font-size:12px;">{d.get("dep_airport","")} {d.get("dep_time","")} → {d.get("arr_airport","")} {d.get("arr_time","")}</span>'
+                html += f' &nbsp;<span style="font-size:11px;color:{sc};">{STATUS_ICON.get(status_val,"")} {status_val}</span>'
+                if d.get("ret_dep_time"):
+                    html += f'<div style="font-size:11px;color:#888;margin-top:2px;">↩️ 복귀 {d.get("ret_dep_time","")} → {d.get("ret_arr_time","")} · {d.get("ret_date","")}</div>'
+                html += '</div>'
+                st.markdown(html, unsafe_allow_html=True)
             st.markdown("---")
 
-        if scheduled:
-            days = sorted(set(int((p.get("details") or {}).get("travel_day",0)) for p in scheduled))
+        # 달력 그리드
+        if conf_scheduled:
+            days = sorted(set(int((p.get("details") or {}).get("travel_day", 0)) for p in conf_scheduled))
+
+            html = '<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;">'
             for day in days:
-                day_places = [p for p in scheduled if int((p.get("details") or {}).get("travel_day",0)) == day]
-                st.markdown(f'<div class="day-header">Day {day}</div>', unsafe_allow_html=True)
-                for p in day_places:
-                    d = p.get("details") or {}
-                    icon = CAT_ICON.get(p["category"], "📌")
-                    status_val = d.get("status","검토중")
-                    sc = STATUS_COLOR.get(status_val,"#ccc")
-                    price_str = ""
-                    if p["category"] == "숙소" and d.get("price_per_night"):
-                        price_str = f" · {int(d['price_per_night']):,}원/박"
-                    elif p["category"] == "놀거리" and d.get("price"):
-                        price_str = f" · {int(d['price']):,}원"
-                    st.markdown(
-                        f'<div style="padding:6px 10px;border-left:3px solid {CAT_COLOR.get(p["category"],"#ccc")};'
-                        f'margin:3px 0;background:#fafafa;border-radius:0 8px 8px 0;color:#1a1a1a;">'
-                        f'{icon} <strong>{p["name"]}</strong>{price_str}'
-                        f' &nbsp;<span style="font-size:11px;color:{sc};">{STATUS_ICON.get(status_val,"")} {status_val}</span>'
-                        f'<span style="float:right;font-size:11px;color:#aaa;">by {p["added_by"]}</span></div>',
-                        unsafe_allow_html=True)
+                actual_date = travel_date + timedelta(days=day - 1)
+                date_label  = f"{actual_date.month}/{actual_date.day}"
+                weekday     = ["월", "화", "수", "목", "금", "토", "일"][actual_date.weekday()]
+                day_places  = [p for p in conf_scheduled
+                               if int((p.get("details") or {}).get("travel_day", 0)) == day]
 
-        if unscheduled:
+                html += '<div style="min-width:150px;flex:1;background:#f8f9fa;border-radius:10px;overflow:hidden;">'
+                html += f'<div style="text-align:center;background:#5B8DEF;color:#fff;padding:8px 4px;">'
+                html += f'<div style="font-weight:800;font-size:14px;">Day {day}</div>'
+                html += f'<div style="font-size:11px;opacity:.85;">{date_label} ({weekday})</div></div>'
+
+                for p in day_places:
+                    d   = p.get("details") or {}
+                    icon = CAT_ICON.get(p["category"], "📌")
+                    sc   = STATUS_COLOR.get(d.get("status", "확정"), "#4ECDC4")
+                    bc   = CAT_COLOR.get(p["category"], "#ccc")
+                    sub  = ""
+                    if p["category"] == "맛집" and d.get("cuisine"):
+                        sub = d["cuisine"]
+                    elif p["category"] == "놀거리" and d.get("price"):
+                        sub = f"{int(d['price']):,}원"
+                    elif p["category"] == "숙소" and d.get("check_in"):
+                        sub = f"체크인 {d['check_in']}"
+                    html += f'<div style="border-left:3px solid {bc};background:#fff;margin:5px;border-radius:0 6px 6px 0;padding:6px 8px;color:#1a1a1a;">'
+                    html += f'<div style="font-size:12px;font-weight:700;">{icon} {p["name"]}</div>'
+                    if sub:
+                        html += f'<div style="font-size:10px;color:#888;">{sub}</div>'
+                    html += f'<div style="font-size:10px;color:{sc};margin-top:2px;">{STATUS_ICON.get(d.get("status","확정"),"")} {d.get("status","확정")}</div>'
+                    html += '</div>'
+
+                html += '</div>'
+            html += '</div>'
+            st.markdown(html, unsafe_allow_html=True)
+
+        # 확정됐지만 일차 미배정
+        if conf_unscheduled:
             st.markdown("---")
-            st.markdown("**📋 일차 미배정**")
-            for p in unscheduled:
+            st.markdown("**📋 확정 (일차 미배정)**")
+            for p in conf_unscheduled:
                 icon = CAT_ICON.get(p["category"], "📌")
-                st.markdown(f"- {icon} {p['name']} *(전체 목록에서 ✏️ 눌러 일차 배정)*")
+                st.markdown(f"- {icon} **{p['name']}** · ✏️ 눌러 일차 배정하면 달력에 표시돼요")
 
 # ── 베스트 픽 ─────────────────────────────────────────────────────────────────
 with tab_best:
