@@ -161,6 +161,30 @@ details[data-testid="stExpander"] {
 
 /* ── Radio buttons ───────────────────────────────────────────────────────────── */
 .stRadio label { color:#000 !important; font-weight:600 !important; }
+
+/* ── Mobile responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .main > div { padding:.2rem .4rem !important; }
+    /* Tabs smaller on phone */
+    .stTabs [data-baseweb="tab"] {
+        font-size:11px !important; padding:6px 9px !important; }
+    /* Card title */
+    .card-title { font-size:14px !important; }
+    /* Smaller meta text */
+    .meta { font-size:11px !important; }
+    /* Chip smaller */
+    .chip { font-size:11px !important; padding:2px 7px !important; }
+    .badge { font-size:11px !important; padding:2px 7px !important; }
+    /* Buttons compact */
+    .stButton > button {
+        font-size:12px !important; padding:6px 8px !important; }
+    /* Metrics smaller */
+    [data-testid="stMetricValue"] { font-size:18px !important; }
+    /* Radio compact */
+    .stRadio label { font-size:12px !important; }
+    /* Countdown */
+    .countdown .d { font-size:32px !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -298,36 +322,27 @@ def card_actions(sb, place, my_name, show_detail=True):
     d          = place.get("details") or {}
     status_val = d.get("status", "검토중")
     is_owner   = place["added_by"] == my_name
-    conf_lbl   = "확정 해제" if status_val == "확정" else "확정"
+    conf_lbl   = "해제" if status_val == "확정" else "확정"
 
     voters_html = "".join(f'<span class="voter-chip">{v}</span>' for v in liked_by)
     if voters_html:
         st.markdown(f'<div style="margin:2px 0 4px 0;">{voters_html}</div>', unsafe_allow_html=True)
 
+    # Row 1: 좋아요 | 보기(접기) | 확정(해제)
     if show_detail:
-        if is_owner:
-            c_vote, c_det, c_conf, c_edit, c_del = st.columns([3, 2, 2, 1, 1])
-        else:
-            cols3 = st.columns([3, 2, 2])
-            c_vote, c_det, c_conf = cols3[0], cols3[1], cols3[2]
-            c_edit = c_del = None
+        c_vote, c_det, c_conf = st.columns([4, 3, 3])
     else:
-        if is_owner:
-            c_vote, c_conf, c_edit, c_del = st.columns([3, 2, 1, 1])
-            c_det = None
-        else:
-            cols2 = st.columns([3, 2])
-            c_vote, c_conf = cols2[0], cols2[1]
-            c_det = c_edit = c_del = None
+        c_vote, c_conf = st.columns([5, 5])
+        c_det = None
 
     with c_vote:
-        lbl = f"{len(liked_by)}명"
+        lbl = f"좋아요 {len(liked_by)}명"
         if st.button(lbl, key=f"v_{place['id']}"):
             toggle_vote(sb, place["id"], my_name, liked_by); st.rerun()
 
     if c_det:
         with c_det:
-            if st.button("접기" if is_open else "자세히 보기", key=f"det_{place['id']}"):
+            if st.button("접기" if is_open else "보기", key=f"det_{place['id']}"):
                 st.session_state[show_key] = not is_open; st.rerun()
 
     with c_conf:
@@ -335,12 +350,12 @@ def card_actions(sb, place, my_name, show_detail=True):
             new_s = "검토중" if status_val == "확정" else "확정"
             update_place(sb, place["id"], {"details": {**d, "status": new_s}}); st.rerun()
 
-    if c_edit:
+    # Row 2 (owner only): 수정 | 삭제
+    if is_owner:
+        c_edit, c_del = st.columns([5, 5])
         with c_edit:
             if st.button("취소" if is_edit else "수정", key=f"edit_btn_{place['id']}"):
                 st.session_state[edit_key] = not is_edit; st.rerun()
-
-    if c_del:
         with c_del:
             if st.button("삭제", key=f"d_{place['id']}"):
                 delete_place(sb, place["id"], place.get("image_path")); st.rerun()
@@ -541,7 +556,7 @@ def card_restaurant(sb, place, my_name):
             f'<div style="display:flex;align-items:flex-start;gap:10px;padding:4px 2px 8px;">'
             f'<div style="flex:1;min-width:0;">'
             f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
-            f'<span style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
+            f'<span class="card-title" style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
             f'<div>{chips}</div></div>'
             f'{thumb}</div>',
@@ -572,7 +587,7 @@ def card_activity(sb, place, my_name):
             f'<div style="display:flex;align-items:flex-start;gap:10px;padding:4px 2px 8px;">'
             f'<div style="flex:1;min-width:0;">'
             f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
-            f'<span style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
+            f'<span class="card-title" style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
             f'<div>{chips}</div></div>'
             f'{thumb}</div>',
@@ -661,7 +676,7 @@ def card_accommodation(sb, place, my_name):
             f'<div style="display:flex;align-items:flex-start;gap:10px;padding:4px 2px 8px;">'
             f'<div style="flex:1;min-width:0;">'
             f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
-            f'<span style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
+            f'<span class="card-title" style="font-size:16px;font-weight:800;color:#000000;">{place["name"]}</span>'
             f'<span class="badge" style="flex-shrink:0;">{place["added_by"]}</span></div>'
             f'<div>{chips}</div>'
             f'{check_str}</div>'
@@ -906,13 +921,10 @@ tab_list, tab_map, tab_schedule, tab_best, tab_expense, tab_add = st.tabs(
 
 # ── 전체 목록 ──────────────────────────────────────────────────────────────────
 with tab_list:
-    _c1, _c2 = st.columns([3, 2])
-    with _c1:
-        sel = st.radio("카테고리", ["전체"] + CATEGORIES, horizontal=True,
+    sel = st.radio("카테고리", ["전체"] + CATEGORIES, horizontal=True,
+                   label_visibility="collapsed")
+    sort_by = st.radio("정렬", ["최신순", "투표순", "상태순"], horizontal=True,
                        label_visibility="collapsed")
-    with _c2:
-        sort_by = st.radio("정렬", ["최신순", "투표순", "상태순"], horizontal=True,
-                           label_visibility="collapsed")
 
     cat_filter = None if sel == "전체" else sel
     places = get_places(sb, cat_filter)
